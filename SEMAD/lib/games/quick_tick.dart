@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 import 'dart:math';
 import 'package:google_fonts/google_fonts.dart';
-
+import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:mathquest/ui_widgets.dart';
 class SamaySudhaarGame extends StatefulWidget {
   const SamaySudhaarGame({super.key});
   @override
@@ -94,7 +95,17 @@ class _SamaySudhaarGameState extends State<SamaySudhaarGame> {
     if (++currentQuestionIndex < maxQuestions) {_loadRiddle();} else {_showFinal();}
   }
 
-  void _showFinal() {
+  void _showFinal() async {
+    // SAVE XP
+    if (score > 0) {
+      try {
+        await Supabase.instance.client.rpc('increment_xp', params: {'amount': score});
+      } catch (e) {
+        debugPrint("Failed to save XP: $e");
+      }
+    }
+
+    if (!mounted) return;
     showDialog(
       context: context,
       barrierDismissible: false,
@@ -397,12 +408,4 @@ class ClockPainter extends CustomPainter {
   }
   @override bool shouldRepaint(CustomPainter oldDelegate) => true;
 }
-
-class GridPainter extends CustomPainter {
-  @override void paint(Canvas canvas, Size size) {
-    final p = Paint()..color = Colors.white.withOpacity(0.03);
-    for (double i = 0; i < size.width; i += 40) canvas.drawLine(Offset(i, 0), Offset(i, size.height), p);
-    for (double i = 0; i < size.height; i += 40) canvas.drawLine(Offset(0, i), Offset(size.width, i), p);
-  }
-  @override bool shouldRepaint(CustomPainter _) => false;
-}
+

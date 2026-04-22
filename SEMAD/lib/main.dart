@@ -11,13 +11,15 @@ import 'package:mathquest/supa.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:mathquest/profile_screen.dart';
 import 'package:mathquest/ui_widgets.dart';
-
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
+  await dotenv.load(fileName: ".env");
+
   await Supabase.initialize(
-    url: 'https://invfekooeeuiiblcdbyt.supabase.co',
-    anonKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImludmZla29vZWV1aWlibGNkYnl0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU1NzcxNTgsImV4cCI6MjA5MTE1MzE1OH0.3kH71qvxOEPVYsD-gKmU1RjztSCH-IsNKlwpMCJ7Jgo',
+    url: dotenv.env['SUPABASE_URL']!,
+    anonKey: dotenv.env['SUPABASE_ANON_KEY']!,
   );
 
   runApp(const MathQuestApp());
@@ -435,23 +437,7 @@ class _GameModuleCardState extends State<GameModuleCard> {
   }
 }
 
-class GridPainter extends CustomPainter {
-  @override
-  void paint(Canvas canvas, Size size) {
-    final paint = Paint()
-      ..color = Colors.white.withOpacity(0.05)
-      ..strokeWidth = 0.5;
-    const double step = 50;
-    for (double x = 0; x <= size.width; x += step) {
-      canvas.drawLine(Offset(x, 0), Offset(x, size.height), paint);
-    }
-    for (double y = 0; y <= size.height; y += step) {
-      canvas.drawLine(Offset(0, y), Offset(size.width, y), paint);
-    }
-  }
-  @override
-  bool shouldRepaint(CustomPainter oldDelegate) => false;
-}
+
 
 class NoThumbScrollBehavior extends ScrollBehavior {
   @override

@@ -80,10 +80,22 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
 
   // --- LOGIC: SAVE ALL INFO (NAME, SCHOOL, GRADE) ---
   Future<void> _saveGeneralInfo() async {
+    final username = _nameController.text.trim();
+    
+    // VALIDATION
+    if (username.isEmpty || username.length < 3 || username.length > 15) {
+      _showError("Username must be 3-15 characters.");
+      return;
+    }
+    if (!RegExp(r'^[a-zA-Z0-9_]+$').hasMatch(username)) {
+      _showError("Username can only contain letters, numbers, and underscores.");
+      return;
+    }
+    
     setState(() => _isLoading = true);
     try {
       await _supabase.from('profiles').update({
-        'username': _nameController.text.trim(),
+        'username': username,
         'school': _schoolController.text.trim(),
         'grade': _gradeController.text.trim(),
       }).eq('id', _supabase.auth.currentUser!.id);

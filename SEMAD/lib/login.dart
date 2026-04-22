@@ -30,13 +30,31 @@ class _MathQuestLoginState extends State<MathQuestLogin> {
 
   // --- AUTH LOGIC ---
   Future<void> _handleAuth() async {
+    final email = _emailController.text.trim();
+    final password = _passwordController.text.trim();
+
+    if (email.isEmpty || !email.contains('@')) {
+      _showSnackBar("Please enter a valid email.");
+      return;
+    }
+    if (password.length < 6) {
+      _showSnackBar("Password must be at least 6 characters.");
+      return;
+    }
+
     setState(() => _isLoading = true);
     try {
       if (_isSignUp) {
+        if (_gradeController.text.trim().isEmpty || _schoolController.text.trim().isEmpty) {
+          _showSnackBar("Please fill in your Grade and School.");
+          setState(() => _isLoading = false);
+          return;
+        }
+
         // 1. SIGN UP
         final AuthResponse res = await SupaService.signUp(
-          _emailController.text.trim(),
-          _passwordController.text.trim(),
+          email,
+          password,
         );
 
         // 2. UPDATE PROFILE

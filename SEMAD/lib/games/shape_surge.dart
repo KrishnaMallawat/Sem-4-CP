@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'dart:async';
 import 'dart:math';
 import 'package:google_fonts/google_fonts.dart';
-
+import 'package:supabase_flutter/supabase_flutter.dart';
 // --- MODELS ---
 enum ShapeType { circle, square, triangle, pentagon, rectangle, scalene, sector, arc, rightTriangle }
 
@@ -173,9 +173,18 @@ class _MathShapeNinjaGameState extends State<MathShapeNinjaGame> with SingleTick
     setState(() => shapes.removeWhere((s) => s.isSliced));
   }
 
-  void _endGame() {
+  void _endGame() async {
     gameLoop?.cancel(); spawnTimer?.cancel(); clockTimer?.cancel();
     setState(() => isGameOver = true);
+
+    // SAVE XP
+    if (score > 0) {
+      try {
+        await Supabase.instance.client.rpc('increment_xp', params: {'amount': score});
+      } catch (e) {
+        debugPrint("Failed to save XP: $e");
+      }
+    }
   }
 
   @override
