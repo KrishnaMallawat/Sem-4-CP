@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'dart:io';
+import 'dart:math' as math;
 import 'package:image_picker/image_picker.dart';
 import 'package:mathquest/ui_widgets.dart';
 
@@ -29,12 +30,33 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
 
   bool _isLoading = false;
   bool _isInitialDataLoaded = false;
+  
+  // Settings
+  bool _soundEnabled = true;
+  bool _hapticsEnabled = true;
+
+  // Domain Mapping for Radar Chart
+  Map<String, double> _domainScores = {
+    'Arithmetic': 0,
+    'Fractions': 0,
+    'Geometry': 0,
+    'Logic': 0,
+    'Speed': 0,
+  };
 
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 4, vsync: this);
+    _tabController = TabController(length: 5, vsync: this); // Increased to 5 for Settings
     _loadSchools();
+    _loadSettings();
+  }
+
+  Future<void> _loadSettings() async {
+    setState(() {
+      _soundEnabled = SettingsService.soundEnabled;
+      _hapticsEnabled = SettingsService.hapticsEnabled;
+    });
   }
 
   Future<void> _loadSchools() async {
@@ -221,6 +243,7 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
             Tab(text: "STATS", icon: Icon(Icons.bar_chart_outlined)),
             Tab(text: "PRIVACY", icon: Icon(Icons.visibility_outlined)),
             Tab(text: "SECURITY", icon: Icon(Icons.lock_outline)),
+            Tab(text: "SETTINGS", icon: Icon(Icons.settings_outlined)),
           ],
         ),
       ),
@@ -264,9 +287,10 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
                   controller: _tabController,
                   children: [
                     _buildProfileTab(data, themeYellow, deepNavy),
-                    _buildStatsTab(themeYellow),
+                    _buildStatsTab(themeYellow, deepNavy),
                     _buildPrivacyTab(themeYellow, deepNavy),
                     _buildSecurityTab(themeYellow, deepNavy),
+                    _buildSettingsTab(themeYellow, deepNavy),
                   ],
                 );
               },
@@ -504,93 +528,206 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
     );
   }
 
-  Widget _buildStatsTab(Color yellow) {
+  Widget _buildStatsTab(Color yellow, Color navy) {
     return FutureBuilder(
-      future: _supabase.from('user_game_stats').select().eq('user_id', _supabase.auth.currentUser!.id),
-      builder: (context, snapshot) {
+      future: Future.wait([
+        _supabase.from('user_game_stats').select().eq('user_id', _supabase.auth.currentUser!.id),
+        _supabase.from('game_sessions').select().eq('user_id', _supabase.auth.currentUser!.id).order('played_at', ascending: false).limit(5),
+      ]),
+      builder: (context, AsyncSnapshot<List<dynamic>> snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
           return Center(child: CircularProgressIndicator(color: yellow));
         }
-        if (snapshot.hasError || !snapshot.hasData) {
-          return Center(
-            child: Text(
-              "No stats available right now.",
-              style: GoogleFonts.lexend(color: Colors.white54),
-            ),
-          );
+        
+        final stats = snapshot.data?[0] as List? ?? [];
+        final history = snapshot.data?[1] as List? ?? [];
+
+        // Calculate domain scores for radar chart
+        for (var stat in stats) {
+          String game = stat['game_name'];
+          double score = (stat['max_score'] ?? 0).toDouble();
+          if (game == 'Bazaar Bill') _domainScores['Arithmetic'] = score;
+          if (game == 'Fraction Fields') _domainScores['Fractions'] = score;
+          if (game == 'Shape Surge') _domainScores['Geometry'] = score;
+          if (game == 'Formula Flash') _domainScores['Logic'] = score;
+          if (game == 'Quick Tick') _domainScores['Speed'] = score;
         }
 
-        final stats = snapshot.data as List;
-        if (stats.isEmpty) {
-          return Center(
-            child: Text(
-              "Play some games to see your stats!",
-              style: GoogleFonts.lexend(color: Colors.white54),
-            ),
-          );
-        }
+        // Find weakest domain
+        String weakest = 'Arithmetic';
+        double minVal = 999;
+        _domainScores.forEach((k, v) {
+          if (v < minVal) {
+            minVal = v;
+            weakest = k;
+          }
+        });
 
-        return ListView.builder(
+        Map<String, String> recommendations = {
+          'Arithmetic': 'Play Bazaar Bill to master your addition!',
+          'Fractions': 'Try Fraction Fields to boost your scaling skills.',
+          'Geometry': 'Slice through shapes in Shape Surge!',
+          'Logic': 'Match patterns in Formula Flash.',
+          'Speed': 'Race against time in Quick Tick.',
+        };
+
+        return SingleChildScrollView(
           padding: const EdgeInsets.all(20),
           physics: const BouncingScrollPhysics(),
-          itemCount: stats.length,
-          itemBuilder: (context, index) {
-            final stat = stats[index];
-            return Container(
-              margin: const EdgeInsets.only(bottom: 15),
-              padding: const EdgeInsets.all(20),
-              decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.04),
-                borderRadius: BorderRadius.circular(15),
-                border: Border.all(color: Colors.white10),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text("SKILL ANALYSIS", style: lexendStyle(size: 14, color: Colors.white70, weight: FontWeight.bold)),
+              const SizedBox(height: 20),
+              
+              // Radar Chart Card
+              Container(
+                height: 250,
+                width: double.infinity,
+                padding: const EdgeInsets.all(20),
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.03),
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(color: Colors.white10),
+                ),
+                child: CustomPaint(
+                  painter: RadarChartPainter(_domainScores, yellow),
+                ),
               ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(
-                        stat['game_name'],
-                        style: GoogleFonts.lexend(
-                          color: yellow,
-                          fontWeight: FontWeight.bold,
-                          fontSize: 18,
-                        ),
+              
+              const SizedBox(height: 25),
+              
+              // Recommendation Card
+              Container(
+                padding: const EdgeInsets.all(20),
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(colors: [yellow.withOpacity(0.2), Colors.transparent]),
+                  borderRadius: BorderRadius.circular(15),
+                  border: Border.all(color: yellow.withOpacity(0.3)),
+                ),
+                child: Row(
+                  children: [
+                    Icon(Icons.auto_awesome, color: yellow),
+                    const SizedBox(width: 15),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text("GROWTH INSIGHT", style: lexendStyle(size: 10, color: yellow, weight: FontWeight.bold)),
+                          const SizedBox(height: 4),
+                          Text(recommendations[weakest] ?? "Keep playing to see insights!", style: lexendStyle(size: 12)),
+                        ],
                       ),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                        decoration: BoxDecoration(
-                          color: yellow.withOpacity(0.1),
-                          borderRadius: BorderRadius.circular(10)
-                        ),
-                        child: Text(
-                          "Last: ${stat['last_score']}",
-                          style: GoogleFonts.lexend(color: yellow, fontWeight: FontWeight.bold, fontSize: 12),
-                        ),
-                      )
-                    ],
+                    ),
+                  ],
+                ),
+              ),
+              
+              const SizedBox(height: 35),
+              Text("RECENT MISSIONS", style: lexendStyle(size: 14, color: Colors.white70, weight: FontWeight.bold)),
+              const SizedBox(height: 15),
+              
+              ...history.map((session) {
+                return Container(
+                  margin: const EdgeInsets.only(bottom: 12),
+                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 15),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.05),
+                    borderRadius: BorderRadius.circular(12),
                   ),
-                  const SizedBox(height: 15),
-                  Row(
+                  child: Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      _statCol("GAMES PLAYED", "${stat['games_played']}"),
-                      _statCol("AVG SCORE", "${stat['avg_score']}"),
-                      _statCol("BEST SCORE", "${stat['max_score']}"),
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(session['game_name'], style: lexendStyle(weight: FontWeight.bold)),
+                          Text(
+                            DateTime.parse(session['played_at']).toLocal().toString().split(' ')[0],
+                            style: lexendStyle(size: 10, color: Colors.white38),
+                          ),
+                        ],
+                      ),
+                      Text("+${session['score']} XP", style: lexendStyle(color: yellow, weight: FontWeight.bold)),
                     ],
                   ),
-                  const SizedBox(height: 15),
-                  Text(
-                    "Last Played: ${DateTime.parse(stat['last_played']).toLocal().toString().split('.')[0]}",
-                    style: GoogleFonts.lexend(color: Colors.white38, fontSize: 10),
-                  )
-                ],
-              ),
-            );
-          },
+                );
+              }).toList(),
+              
+              if (history.isEmpty)
+                Center(child: Text("No missions recorded yet.", style: lexendStyle(color: Colors.white24))),
+              
+              const SizedBox(height: 100),
+            ],
+          ),
         );
       },
+    );
+  }
+
+  Widget _buildSettingsTab(Color yellow, Color navy) {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(25),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text("GAME PREFERENCES", style: lexendStyle(size: 14, color: Colors.white70, weight: FontWeight.bold)),
+          const SizedBox(height: 20),
+          _buildToggleSetting("SOUND EFFECTS", "Enable immersive game sounds", _soundEnabled, (v) async {
+            setState(() => _soundEnabled = v);
+            await SettingsService.setSound(v);
+          }, yellow),
+          _buildToggleSetting("HAPTIC FEEDBACK", "Tactile vibrations during play", _hapticsEnabled, (v) async {
+            setState(() => _hapticsEnabled = v);
+            await SettingsService.setHaptics(v);
+          }, yellow),
+          
+          const SizedBox(height: 40),
+          Text("ABOUT MATHQUEST", style: lexendStyle(size: 14, color: Colors.white70, weight: FontWeight.bold)),
+          const SizedBox(height: 15),
+          ListTile(
+            contentPadding: EdgeInsets.zero,
+            title: Text("Version", style: lexendStyle()),
+            trailing: Text("1.0.0", style: lexendStyle(color: Colors.white38)),
+          ),
+          ListTile(
+            contentPadding: EdgeInsets.zero,
+            title: Text("Clear Game Cache", style: lexendStyle()),
+            trailing: Icon(Icons.chevron_right, color: Colors.white38),
+            onTap: () {},
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildToggleSetting(String title, String subtitle, bool value, Function(bool) onChanged, Color yellow) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 15),
+      padding: const EdgeInsets.all(15),
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.04),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(title, style: lexendStyle(weight: FontWeight.bold)),
+                Text(subtitle, style: lexendStyle(size: 11, color: Colors.white38)),
+              ],
+            ),
+          ),
+          Switch(
+            value: value,
+            onChanged: onChanged,
+            activeColor: yellow,
+            activeTrackColor: yellow.withOpacity(0.3),
+          ),
+        ],
+      ),
     );
   }
 
@@ -604,4 +741,90 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
       ],
     );
   }
+}
+
+class RadarChartPainter extends CustomPainter {
+  final Map<String, double> scores;
+  final Color color;
+
+  RadarChartPainter(this.scores, this.color);
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final center = Offset(size.width / 2, size.height / 2);
+    final radius = size.width / 2 * 0.7;
+    final domains = scores.keys.toList();
+    final angleStep = (2 * math.pi) / domains.length;
+
+    final linePaint = Paint()
+      ..color = Colors.white.withOpacity(0.15)
+      ..strokeWidth = 1.0
+      ..style = PaintingStyle.stroke;
+
+    final fillPaint = Paint()
+      ..color = color.withOpacity(0.3)
+      ..style = PaintingStyle.fill;
+
+    final borderPaint = Paint()
+      ..color = color
+      ..strokeWidth = 2.0
+      ..style = PaintingStyle.stroke;
+
+    final textPainter = TextPainter(textDirection: TextDirection.ltr);
+
+    // Draw background spokes and circles
+    for (var i = 1; i <= 4; i++) {
+      canvas.drawCircle(center, radius * (i / 4), linePaint);
+    }
+
+    final points = <Offset>[];
+    for (var i = 0; i < domains.length; i++) {
+      final angle = i * angleStep - (math.pi / 2);
+      
+      // Spoke line
+      final spokeEnd = Offset(
+        center.dx + radius * math.cos(angle),
+        center.dy + radius * math.sin(angle),
+      );
+      canvas.drawLine(center, spokeEnd, linePaint);
+
+      // Label
+      textPainter.text = TextSpan(
+        text: domains[i].toUpperCase(),
+        style: GoogleFonts.lexend(color: Colors.white54, fontSize: 8, fontWeight: FontWeight.bold),
+      );
+      textPainter.layout();
+      final labelOffset = Offset(
+        center.dx + (radius + 20) * math.cos(angle) - (textPainter.width / 2),
+        center.dy + (radius + 20) * math.sin(angle) - (textPainter.height / 2),
+      );
+      textPainter.paint(canvas, labelOffset);
+
+      // Score point
+      double score = (scores[domains[i]] ?? 0).clamp(0, 500); // Scale: max 500 XP per domain for chart
+      double normalized = (score / 500).clamp(0.1, 1.0); 
+      points.add(Offset(
+        center.dx + radius * normalized * math.cos(angle),
+        center.dy + radius * normalized * math.sin(angle),
+      ));
+    }
+
+    // Draw score polygon
+    final path = Path()..moveTo(points[0].dx, points[0].dy);
+    for (var i = 1; i < points.length; i++) {
+      path.lineTo(points[i].dx, points[i].dy);
+    }
+    path.close();
+
+    canvas.drawPath(path, fillPaint);
+    canvas.drawPath(path, borderPaint);
+    
+    // Draw points
+    for (var p in points) {
+      canvas.drawCircle(p, 3, Paint()..color = Colors.white);
+    }
+  }
+
+  @override
+  bool shouldRepaint(RadarChartPainter old) => true;
 }

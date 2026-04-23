@@ -22,6 +22,8 @@ void main() async {
     anonKey: dotenv.env['SUPABASE_ANON_KEY']!,
   );
 
+  await SettingsService.init();
+
   runApp(const MathQuestApp());
 }
 
@@ -443,8 +445,15 @@ class NoThumbScrollBehavior extends ScrollBehavior {
   Widget buildScrollbar(context, child, details) => child;
 }
 
-class LeaderboardScreen extends StatelessWidget {
+class LeaderboardScreen extends StatefulWidget {
   const LeaderboardScreen({super.key});
+
+  @override
+  State<LeaderboardScreen> createState() => _LeaderboardScreenState();
+}
+
+class _LeaderboardScreenState extends State<LeaderboardScreen> {
+  String _globalSubFilter = 'individuals'; // 'individuals' or 'schools'
 
   @override
   Widget build(BuildContext context) {
@@ -490,7 +499,7 @@ class LeaderboardScreen extends StatelessWidget {
             ),
             TabBarView(
               children: [
-                _buildLeaderboardTab(themeYellow, petalPink, filter: 'global'),
+                _buildGlobalTab(themeYellow, petalPink),
                 _buildLeaderboardTab(themeYellow, petalPink, filter: 'school'),
                 _buildFriendsTab(context, themeYellow, petalPink),
               ],
@@ -498,6 +507,105 @@ class LeaderboardScreen extends StatelessWidget {
           ],
         ),
       ),
+    );
+  Widget _buildGlobalTab(Color yellow, Color pink) {
+    return Column(
+      children: [
+        const SizedBox(height: 15),
+        // Sub-toggle
+        Container(
+          margin: const EdgeInsets.symmetric(horizontal: 40),
+          decoration: BoxDecoration(
+            color: Colors.white.withOpacity(0.05),
+            borderRadius: BorderRadius.circular(10),
+          ),
+          child: Row(
+            children: [
+              _subFilterBtn("INDIVIDUALS", 'individuals', yellow),
+              _subFilterBtn("SCHOOLS", 'schools', yellow),
+            ],
+          ),
+        ),
+        const SizedBox(height: 10),
+        Expanded(
+          child: _globalSubFilter == 'individuals' 
+            ? _buildLeaderboardTab(yellow, pink, filter: 'global')
+            : _buildSchoolLeaderboard(yellow),
+        ),
+      ],
+    );
+  }
+
+  Widget _subFilterBtn(String label, String value, Color yellow) {
+    bool isSelected = _globalSubFilter == value;
+    return Expanded(
+      child: GestureDetector(
+        onTap: () => setState(() => _globalSubFilter = value),
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: 10),
+          decoration: BoxDecoration(
+            color: isSelected ? yellow : Colors.transparent,
+            borderRadius: BorderRadius.circular(10),
+          ),
+          child: Text(
+            label,
+            textAlign: TextAlign.center,
+            style: GoogleFonts.lexend(
+              color: isSelected ? const Color(0xFF000C2D) : Colors.white54,
+              fontSize: 10,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSchoolLeaderboard(Color yellow) {
+    return StreamBuilder(
+      stream: supabase.from('school_leaderboard').stream(primaryKey: ['school']).order('total_xp', ascending: false),
+      builder: (context, snapshot) {
+        if (!snapshot.hasData) return Center(child: CircularProgressIndicator(color: yellow));
+        
+        final schools = snapshot.data!;
+        if (schools.isEmpty) return Center(child: Text("No schools ranked yet.", style: GoogleFonts.lexend(color: Colors.white24)));
+
+        return ListView.builder(
+          padding: const EdgeInsets.all(20),
+          itemCount: schools.length,
+          itemBuilder: (context, index) {
+            final s = schools[index];
+            return Container(
+              margin: const EdgeInsets.only(bottom: 15),
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                color: Colors.white.withOpacity(0.04),
+                borderRadius: BorderRadius.circular(15),
+                border: Border.all(color: Colors.white10),
+              ),
+              child: Row(
+                children: [
+                  CircleAvatar(
+                    backgroundColor: yellow.withOpacity(0.1),
+                    child: Text("${index + 1}", style: GoogleFonts.lexend(color: yellow, fontWeight: FontWeight.bold)),
+                  ),
+                  const SizedBox(width: 20),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(s['school'] ?? "Unknown School", style: GoogleFonts.lexend(color: Colors.white, fontWeight: FontWeight.bold)),
+                        Text("${s['student_count']} Students", style: GoogleFonts.lexend(color: Colors.white38, fontSize: 10)),
+                      ],
+                    ),
+                  ),
+                  Text("${s['total_xp']} XP", style: GoogleFonts.lexend(color: yellow, fontWeight: FontWeight.bold, fontSize: 18)),
+                ],
+              ),
+            );
+          },
+        );
+      },
     );
   }
 }
