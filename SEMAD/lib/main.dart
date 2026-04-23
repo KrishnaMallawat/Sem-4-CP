@@ -166,7 +166,7 @@ class GanitControlCenter extends StatelessWidget {
               child: const SizedBox(height: 160, width: double.infinity),
             ),
             const SizedBox(height: 10),
-            _buildDrawerItem(Icons.person_outline, "Profile", () {
+            _buildDrawerItem(Icons.settings, "Profile & Settings", () {
               Navigator.push(
                 context,
                 MaterialPageRoute(builder: (context) => const ProfileScreen()),
@@ -453,156 +453,407 @@ void _showLeaderboard(BuildContext context) {
     context,
     MaterialPageRoute(
       fullscreenDialog: true,
-      builder: (context) => Scaffold(
-        backgroundColor: deepNavy, // Solid base
-        body: Stack(
-          children: [
-            // 1. THE LOGIN PAGE GRADIENT
-            Container(
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.bottomCenter,
-                  end: Alignment.topCenter,
-                  colors: [
-                    petalPink.withOpacity(0.2),
-                    const Color(0xFF5D3DF8).withOpacity(0.1),
-                    Colors.transparent,
-                  ],
-                  stops: const [0.0, 0.25, 0.5],
+      builder: (context) => DefaultTabController(
+        length: 3,
+        child: Scaffold(
+          backgroundColor: deepNavy,
+          appBar: AppBar(
+            backgroundColor: deepNavy,
+            elevation: 0,
+            leading: IconButton(
+              icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white, size: 22),
+              onPressed: () => Navigator.pop(context),
+            ),
+            title: Text(
+              "RANKINGS",
+              style: GoogleFonts.lexend(
+                color: Colors.white,
+                fontSize: 18,
+                fontWeight: FontWeight.w800,
+                letterSpacing: 1.5,
+              ),
+            ),
+            bottom: TabBar(
+              indicatorColor: themeYellow,
+              labelColor: themeYellow,
+              unselectedLabelColor: Colors.white54,
+              labelStyle: GoogleFonts.lexend(fontWeight: FontWeight.bold, fontSize: 12),
+              tabs: const [
+                Tab(text: "GLOBAL"),
+                Tab(text: "SCHOOL"),
+                Tab(text: "FRIENDS"),
+              ],
+            ),
+          ),
+          body: Stack(
+            children: [
+              Positioned.fill(
+                child: Opacity(
+                  opacity: 0.05,
+                  child: CustomPaint(painter: MagicGridPainter()),
                 ),
               ),
-            ),
-
-            // 2. THE GRID SYSTEM (Opacity 0.1 for subtle look)
-            Positioned.fill(
-              child: Opacity(
-                opacity: 0.1,
-                child: CustomPaint(painter: MagicGridPainter()),
-              ),
-            ),
-
-            // 3. THE CONTENT
-            SafeArea(
-              child: Column(
+              TabBarView(
                 children: [
-                  // --- CUSTOM APP BAR ---
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 15),
-                    child: Row(
-                      children: [
-                        IconButton(
-                          icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white, size: 22),
-                          onPressed: () => Navigator.pop(context),
-                        ),
-                        const SizedBox(width: 8),
-                        Text(
-                          "GLOBAL RANKINGS",
-                          style: GoogleFonts.lexend(
-                            color: Colors.white,
-                            fontSize: 20,
-                            fontWeight: FontWeight.w800,
-                            letterSpacing: 1.5,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-
-                  // --- THE RANKINGS LIST ---
-                  Expanded(
-                    child: StreamBuilder(
-                      stream: supabase
-                          .from('profiles')
-                          .stream(primaryKey: ['id'])
-                          .order('xp', ascending: false)
-                          .limit(20),
-                      builder: (context, snapshot) {
-                        if (!snapshot.hasData) {
-                          return const Center(child: CircularProgressIndicator(color: themeYellow));
-                        }
-
-                        final players = snapshot.data!;
-
-                        return ListView.builder(
-                          padding: const EdgeInsets.fromLTRB(20, 10, 20, 100), // Bottom padding for controls
-                          physics: const BouncingScrollPhysics(),
-                          itemCount: players.length,
-                          itemBuilder: (context, index) {
-                            final player = players[index];
-                            bool isMe = player['id'] == supabase.auth.currentUser!.id;
-
-                            Color rankColor = index == 0 ? themeYellow : (index == 1 ? Colors.white70 : (index == 2 ? Colors.orangeAccent : Colors.white24));
-
-                            return Container(
-                              // 1. Reduce the gap between rows
-                              margin: const EdgeInsets.only(bottom: 15),
-
-                              // 2. Slim down the internal spacing (Vertical from 16 to 10)
-                              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-
-                              decoration: BoxDecoration(
-                                color: isMe ? petalPink.withOpacity(0.12) : Colors.white.withOpacity(0.04),
-                                borderRadius: BorderRadius.circular(10),
-                                border: Border.all(
-                                  color: isMe ? petalPink.withOpacity(1.0) : Colors.white.withOpacity(0.05),
-                                  width: 1,
-                                ),
-                              ),
-                              child: Row(
-                                children: [
-                                  // RANK
-                                  SizedBox(
-                                    width: 35,
-                                    child: Text("${index + 1}",
-                                        style: GoogleFonts.lexend(color: rankColor, fontWeight: FontWeight.w900, fontSize: 22)),
-                                  ),
-                                  const SizedBox(width: 10),
-
-                                  // AVATAR
-                                  CircleAvatar(
-                                    radius: 22,
-                                    backgroundColor: Colors.white12,
-                                    backgroundImage: player['avatar_url'] != null ? NetworkImage(player['avatar_url']) : null,
-                                    child: player['avatar_url'] == null ? const Icon(Icons.person, size: 20, color: Colors.white24) : null,
-                                  ),
-                                  const SizedBox(width: 15),
-
-                                  // NAME
-                                  Expanded(
-                                    child: Text(
-                                        player['username'] ?? "ADVENTURER",
-                                        style: GoogleFonts.lexend(
-                                            color: isMe ? Colors.white : Colors.white70,
-                                            fontWeight: isMe ? FontWeight.w700 : FontWeight.w400,
-                                            fontSize: 16
-                                        )
-                                    ),
-                                  ),
-
-                                  // XP
-                                  Column(
-                                    crossAxisAlignment: CrossAxisAlignment.end,
-                                    children: [
-                                      Text("${player['xp']}",
-                                          style: GoogleFonts.lexend(color: themeYellow, fontWeight: FontWeight.w900, fontSize: 18)),
-                                      Text("XP", style: GoogleFonts.lexend(color: Colors.white24, fontSize: 10, fontWeight: FontWeight.bold)),
-                                    ],
-                                  ),
-                                ],
-                              ),
-                            );
-                          },
-                        );
-                      },
-                    ),
-                  ),
+                  _buildLeaderboardTab(themeYellow, petalPink, filter: 'global'),
+                  _buildLeaderboardTab(themeYellow, petalPink, filter: 'school'),
+                  _buildFriendsTab(context, themeYellow, petalPink),
                 ],
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     ),
+  );
+}
+
+Widget _buildLeaderboardTab(Color themeYellow, Color petalPink, {required String filter}) {
+  return StreamBuilder(
+    stream: supabase.from('profiles').stream(primaryKey: ['id']).order('xp', ascending: false),
+    builder: (context, snapshot) {
+      if (!snapshot.hasData) {
+        return Center(child: CircularProgressIndicator(color: themeYellow));
+      }
+
+      final allPlayers = snapshot.data!;
+      final currentUserId = supabase.auth.currentUser!.id;
+      final currentUserProfile = allPlayers.firstWhere((p) => p['id'] == currentUserId, orElse: () => {});
+      final mySchool = currentUserProfile['school'];
+
+      List<Map<String, dynamic>> filteredPlayers = [];
+
+      for (var p in allPlayers) {
+        String visibility = p['leaderboard_visibility'] ?? 'global';
+        bool isMe = p['id'] == currentUserId;
+
+        if (filter == 'global') {
+          if (visibility == 'school' && !isMe) continue; // Hide school-only from global unless me
+          filteredPlayers.add(p);
+        } else if (filter == 'school') {
+          if (mySchool == null || mySchool.isEmpty) continue; 
+          if (p['school'] != mySchool) continue; 
+          filteredPlayers.add(p);
+        }
+      }
+
+      // Re-sort just in case, limit to top 50
+      filteredPlayers.sort((a, b) => (b['xp'] ?? 0).compareTo(a['xp'] ?? 0));
+      if (filteredPlayers.length > 50) filteredPlayers = filteredPlayers.sublist(0, 50);
+
+      if (filteredPlayers.isEmpty) {
+        return Center(
+          child: Text(
+            filter == 'school' ? "Set your school to see rankings!" : "No players found.",
+            style: GoogleFonts.lexend(color: Colors.white54),
+          ),
+        );
+      }
+
+      return ListView.builder(
+        padding: const EdgeInsets.fromLTRB(20, 20, 20, 100),
+        physics: const BouncingScrollPhysics(),
+        itemCount: filteredPlayers.length,
+        itemBuilder: (context, index) {
+          final player = filteredPlayers[index];
+          bool isMe = player['id'] == currentUserId;
+          String visibility = player['leaderboard_visibility'] ?? 'global';
+          
+          String displayName = player['username'] ?? "ADVENTURER";
+          if (!isMe && visibility == 'hidden') {
+            displayName = "Anonymous Adventurer";
+          }
+
+          Color rankColor = index == 0 ? themeYellow : (index == 1 ? Colors.white70 : (index == 2 ? Colors.orangeAccent : Colors.white24));
+
+          return GestureDetector(
+            onTap: () => _showPlayerProfileBottomSheet(context, player, isMe),
+            child: Container(
+              margin: const EdgeInsets.only(bottom: 15),
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+              decoration: BoxDecoration(
+                color: isMe ? petalPink.withOpacity(0.12) : Colors.white.withOpacity(0.04),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(
+                  color: isMe ? petalPink.withOpacity(1.0) : Colors.white.withOpacity(0.05),
+                  width: 1,
+                ),
+              ),
+            child: Row(
+              children: [
+                SizedBox(
+                  width: 35,
+                  child: Text("${index + 1}", style: GoogleFonts.lexend(color: rankColor, fontWeight: FontWeight.w900, fontSize: 22)),
+                ),
+                const SizedBox(width: 10),
+                CircleAvatar(
+                  radius: 22,
+                  backgroundColor: Colors.white12,
+                  backgroundImage: (player['avatar_url'] != null && visibility != 'hidden') ? NetworkImage(player['avatar_url']) : null,
+                  child: (player['avatar_url'] == null || visibility == 'hidden') ? const Icon(Icons.person, size: 20, color: Colors.white24) : null,
+                ),
+                const SizedBox(width: 15),
+                Expanded(
+                  child: Text(
+                    displayName,
+                    style: GoogleFonts.lexend(
+                      color: isMe ? Colors.white : Colors.white70,
+                      fontWeight: isMe ? FontWeight.w700 : FontWeight.w400,
+                      fontSize: 16
+                    )
+                  ),
+                ),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    Text("${player['xp'] ?? 0}", style: GoogleFonts.lexend(color: themeYellow, fontWeight: FontWeight.w900, fontSize: 18)),
+                    Text("XP", style: GoogleFonts.lexend(color: Colors.white24, fontSize: 10, fontWeight: FontWeight.bold)),
+                  ],
+                ),
+              ],
+            ),
+           ),
+          );
+        },
+      );
+    },
+  );
+}
+
+void _showPlayerProfileBottomSheet(BuildContext context, Map<String, dynamic> player, bool isMe) {
+  final Color themeYellow = const Color(0xFFFFC741);
+  final String? avatarUrl = player['avatar_url'];
+  
+  showModalBottomSheet(
+    context: context,
+    backgroundColor: const Color(0xFF000C2D),
+    shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+    builder: (context) {
+      return Container(
+        padding: const EdgeInsets.all(30),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            CircleAvatar(
+              radius: 40,
+              backgroundColor: Colors.white12,
+              backgroundImage: avatarUrl != null ? NetworkImage(avatarUrl) : null,
+              child: avatarUrl == null ? const Icon(Icons.person, size: 40, color: Colors.white24) : null,
+            ),
+            const SizedBox(height: 15),
+            Text(player['username'] ?? 'ADVENTURER', style: GoogleFonts.lexend(fontSize: 22, color: Colors.white, fontWeight: FontWeight.bold)),
+            if (player['school'] != null && player['school'].toString().isNotEmpty) 
+              Text(player['school'], style: GoogleFonts.lexend(color: Colors.white54, fontSize: 12), textAlign: TextAlign.center),
+            const SizedBox(height: 10),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 5),
+              decoration: BoxDecoration(color: themeYellow.withOpacity(0.1), borderRadius: BorderRadius.circular(20)),
+              child: Text("${player['xp'] ?? 0} XP", style: GoogleFonts.lexend(color: themeYellow, fontWeight: FontWeight.bold)),
+            ),
+            const SizedBox(height: 30),
+            if (!isMe)
+              ElevatedButton.icon(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: themeYellow,
+                  foregroundColor: const Color(0xFF000C2D),
+                  minimumSize: const Size(double.infinity, 50),
+                ),
+                icon: const Icon(Icons.person_add_rounded),
+                label: Text("SEND FRIEND REQUEST", style: GoogleFonts.lexend(fontWeight: FontWeight.bold)),
+                onPressed: () async {
+                  try {
+                    await SupaService.sendFriendRequestById(player['id']);
+                    if (context.mounted) {
+                      Navigator.pop(context);
+                      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Friend request sent!")));
+                    }
+                  } catch (e) {
+                    if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString().replaceAll("Exception: ", ""))));
+                  }
+                },
+              )
+          ],
+        ),
+      );
+    }
+  );
+}
+
+Widget _buildFriendsTab(BuildContext context, Color themeYellow, Color petalPink) {
+  return StreamBuilder<List<Map<String, dynamic>>>(
+    stream: SupaService.getFriendshipsStream(),
+    builder: (context, snapshot) {
+      if (!snapshot.hasData) return Center(child: CircularProgressIndicator(color: themeYellow));
+
+      final friendships = snapshot.data!;
+      final myId = supabase.auth.currentUser!.id;
+
+      final pendingIncoming = friendships.where((f) => f['status'] == 'pending' && f['addressee_id'] == myId).toList();
+      final accepted = friendships.where((f) => f['status'] == 'accepted').toList();
+
+      final userIdsToFetch = <String>{};
+      for (var f in pendingIncoming) userIdsToFetch.add(f['requester_id']);
+      for (var f in accepted) {
+        userIdsToFetch.add(f['requester_id'] == myId ? f['addressee_id'] : f['requester_id']);
+      }
+
+      return FutureBuilder(
+        // Always execute future, but if list is empty, just return empty list to avoid Supabase error
+        future: userIdsToFetch.isEmpty 
+          ? Future.value([]) 
+          : supabase.from('profiles').select().inFilter('id', userIdsToFetch.toList()),
+        builder: (context, profileSnap) {
+          if (!profileSnap.hasData) return const Center(child: CircularProgressIndicator(color: Colors.white24));
+
+          final profiles = (profileSnap.data as List).cast<Map<String, dynamic>>();
+          
+          // Sort accepted friends by XP
+          final acceptedProfiles = profiles.where((p) => accepted.any((f) => f['requester_id'] == p['id'] || f['addressee_id'] == p['id'])).toList();
+          acceptedProfiles.sort((a, b) => (b['xp'] ?? 0).compareTo(a['xp'] ?? 0));
+
+          return ListView(
+            padding: const EdgeInsets.all(20),
+            physics: const BouncingScrollPhysics(),
+            children: [
+              // 1. ADD FRIEND BUTTON
+              ElevatedButton.icon(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.white.withOpacity(0.1),
+                  foregroundColor: Colors.white,
+                  minimumSize: const Size(double.infinity, 50),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                ),
+                icon: const Icon(Icons.person_add_alt_1),
+                label: Text("ADD FRIEND BY TAG", style: GoogleFonts.lexend()),
+                onPressed: () => _showAddFriendDialog(context),
+              ),
+              const SizedBox(height: 30),
+
+              // 2. PENDING REQUESTS
+              if (pendingIncoming.isNotEmpty) ...[
+                Text("PENDING REQUESTS", style: GoogleFonts.lexend(color: Colors.white54, fontSize: 12, fontWeight: FontWeight.bold)),
+                const SizedBox(height: 10),
+                ...pendingIncoming.map((f) {
+                  final p = profiles.firstWhere((profile) => profile['id'] == f['requester_id'], orElse: () => {});
+                  return Container(
+                    margin: const EdgeInsets.only(bottom: 10),
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(color: Colors.white.withOpacity(0.05), borderRadius: BorderRadius.circular(10)),
+                    child: Row(
+                      children: [
+                        CircleAvatar(
+                          radius: 18,
+                          backgroundColor: Colors.white12,
+                          backgroundImage: p['avatar_url'] != null ? NetworkImage(p['avatar_url']) : null,
+                          child: p['avatar_url'] == null ? const Icon(Icons.person, size: 18, color: Colors.white24) : null,
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(child: Text(p['username'] ?? 'Unknown', style: GoogleFonts.lexend(color: Colors.white, fontWeight: FontWeight.bold))),
+                        IconButton(
+                          icon: const Icon(Icons.check_circle, color: Colors.greenAccent),
+                          onPressed: () => SupaService.acceptFriendRequest(f['id']),
+                        ),
+                        IconButton(
+                          icon: const Icon(Icons.cancel, color: Colors.redAccent),
+                          onPressed: () => SupaService.removeOrRejectFriend(f['id']),
+                        ),
+                      ],
+                    ),
+                  );
+                }),
+                const SizedBox(height: 30),
+              ],
+
+              // 3. ACCEPTED FRIENDS LEADERBOARD
+              Text("YOUR SQUAD", style: GoogleFonts.lexend(color: Colors.white54, fontSize: 12, fontWeight: FontWeight.bold)),
+              const SizedBox(height: 10),
+              if (acceptedProfiles.isEmpty)
+                Center(child: Padding(
+                  padding: const EdgeInsets.all(40.0),
+                  child: Text("No friends yet. Add someone!", style: GoogleFonts.lexend(color: Colors.white38)),
+                )),
+              ...acceptedProfiles.asMap().entries.map((entry) {
+                int index = entry.key;
+                var player = entry.value;
+                Color rankColor = index == 0 ? themeYellow : (index == 1 ? Colors.white70 : (index == 2 ? Colors.orangeAccent : Colors.white24));
+                
+                return GestureDetector(
+                  onTap: () => _showPlayerProfileBottomSheet(context, player, false),
+                  child: Container(
+                    margin: const EdgeInsets.only(bottom: 10),
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withOpacity(0.04),
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(color: Colors.white.withOpacity(0.05), width: 1),
+                    ),
+                    child: Row(
+                      children: [
+                        SizedBox(width: 30, child: Text("${index + 1}", style: GoogleFonts.lexend(color: rankColor, fontWeight: FontWeight.bold, fontSize: 18))),
+                        CircleAvatar(
+                          radius: 18,
+                          backgroundColor: Colors.white12,
+                          backgroundImage: player['avatar_url'] != null ? NetworkImage(player['avatar_url']) : null,
+                          child: player['avatar_url'] == null ? const Icon(Icons.person, size: 16, color: Colors.white24) : null,
+                        ),
+                        const SizedBox(width: 15),
+                        Expanded(child: Text(player['username'] ?? "ADVENTURER", style: GoogleFonts.lexend(color: Colors.white, fontWeight: FontWeight.w600, fontSize: 14))),
+                        Text("${player['xp'] ?? 0} XP", style: GoogleFonts.lexend(color: themeYellow, fontWeight: FontWeight.bold, fontSize: 14)),
+                      ],
+                    ),
+                  ),
+                );
+              }),
+            ],
+          );
+        },
+      );
+    },
+  );
+}
+
+void _showAddFriendDialog(BuildContext context) {
+  final tagController = TextEditingController();
+  showDialog(
+    context: context,
+    builder: (context) {
+      return AlertDialog(
+        backgroundColor: const Color(0xFF000C2D),
+        title: Text("ADD FRIEND", style: GoogleFonts.lexend(color: Colors.white, fontWeight: FontWeight.bold)),
+        content: TextField(
+          controller: tagController,
+          style: GoogleFonts.lexend(color: Colors.white),
+          decoration: InputDecoration(
+            hintText: "Enter Friend's Tag (e.g. alex1234)",
+            hintStyle: GoogleFonts.lexend(color: Colors.white38),
+            filled: true,
+            fillColor: Colors.white.withOpacity(0.05),
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide.none),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text("CANCEL", style: GoogleFonts.lexend(color: Colors.white54)),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFFFC741)),
+            onPressed: () async {
+              try {
+                await SupaService.sendFriendRequestByTag(tagController.text.trim());
+                if (context.mounted) {
+                  Navigator.pop(context);
+                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Friend request sent!")));
+                }
+              } catch (e) {
+                if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString().replaceAll("Exception: ", ""))));
+              }
+            },
+            child: Text("SEND", style: GoogleFonts.lexend(color: const Color(0xFF000C2D), fontWeight: FontWeight.bold)),
+          ),
+        ],
+      );
+    }
   );
 }
 

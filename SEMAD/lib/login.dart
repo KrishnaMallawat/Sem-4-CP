@@ -57,14 +57,27 @@ class _MathQuestLoginState extends State<MathQuestLogin> {
           password,
         );
 
-        // 2. UPDATE PROFILE
-        // We pass the data to fill the row created by your SQL trigger
-        await SupaService.updateProfile(
-          grade: _gradeController.text.trim(),
-          school: _schoolController.text.trim(),
-        );
+        // 2. GENERATE TAG
+        final baseName = email.split('@').first;
+        final userTag = await SupaService.generateUniqueTag(baseName);
 
-        // 3. REDIRECT TO HOME (Missing this line was the issue!)
+        // 3. UPDATE PROFILE
+        // We pass the data to fill the row created by your SQL trigger
+        await Supabase.instance.client.from('profiles').update({
+          'grade': _gradeController.text.trim(),
+          'school': _schoolController.text.trim(),
+          'user_tag': userTag,
+        }).eq('id', res.user!.id);
+
+        // Try inserting into schools table just in case it's new
+        final schoolName = _schoolController.text.trim();
+        if (schoolName.isNotEmpty) {
+          try {
+            await Supabase.instance.client.from('schools').insert({'school_name': schoolName});
+          } catch(_) {} 
+        }
+
+        // 4. REDIRECT TO HOME
         if (res.user != null && mounted) {
           Navigator.pushReplacement(
             context,

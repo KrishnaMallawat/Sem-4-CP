@@ -16,6 +16,9 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
   late TabController _tabController;
   final _supabase = Supabase.instance.client;
   bool _isUploading = false;
+  List<String> _schoolOptions = [];
+  String _visibility = 'global';
+  final _userTagController = TextEditingController();
 
   // Controllers
   final _nameController = TextEditingController(); // Added for Username
@@ -29,7 +32,19 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 2, vsync: this);
+    _tabController = TabController(length: 3, vsync: this);
+    _loadSchools();
+  }
+
+  Future<void> _loadSchools() async {
+    try {
+      final res = await _supabase.from('schools').select('school_name').order('school_name');
+      setState(() {
+        _schoolOptions = (res as List).map((r) => r['school_name'].toString()).toList();
+      });
+    } catch(e) {
+      debugPrint("Error loading schools: $e");
+    }
   }
 
   @override
@@ -40,6 +55,7 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
     _gradeController.dispose();
     _passController.dispose();
     _confirmPassController.dispose();
+    _userTagController.dispose();
     super.dispose();
   }
 
@@ -94,16 +110,55 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
     
     setState(() => _isLoading = true);
     try {
+      final schoolName = _schoolController.text.trim();
+      if (schoolName.isNotEmpty) {
+        try {
+          await _supabase.from('schools').insert({'school_name': schoolName});
+        } catch(_) {} // Ignore if already exists
+      }
+
       await _supabase.from('profiles').update({
         'username': username,
-        'school': _schoolController.text.trim(),
+        'school': schoolName,
         'grade': _gradeController.text.trim(),
+        'leaderboard_visibility': _visibility,
+        'user_tag': _userTagController.text.trim(),
       }).eq('id', _supabase.auth.currentUser!.id);
-
 
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Profile Updated!", style: lexendStyle())));
     } catch (e) {
       _showError(e.toString());
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  // --- LOGIC: SAVE PRIVACY INFO ---
+  Future<void> _savePrivacyInfo() async {
+    final tag = _userTagController.text.trim();
+    if (tag.isEmpty) {
+      _showError("User Tag cannot be empty.");
+      return;
+    }
+    if (!RegExp(r'^[a-zA-Z0-9_]+$').hasMatch(tag)) {
+      _showError("User Tag can only contain letters, numbers, and underscores.");
+      return;
+    }
+
+    setState(() => _isLoading = true);
+    try {
+      await _supabase.from('profiles').update({
+        'leaderboard_visibility': _visibility,
+        'user_tag': tag,
+      }).eq('id', _supabase.auth.currentUser!.id);
+
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Privacy Settings Saved!", style: lexendStyle())));
+    } catch (e) {
+      if (e.toString().contains('unique constraint')) {
+        _showError("User Tag is already taken by someone else!");
+      } else {
+        _showError(e.toString());
+      }
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
@@ -148,9 +203,10 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
         bottom: TabBar(
           controller: _tabController,
           indicatorColor: themeYellow,
-          labelStyle: lexendStyle(weight: FontWeight.bold),
+          labelStyle: lexendStyle(weight: FontWeight.bold, size: 10),
           tabs: const [
             Tab(text: "PROFILE", icon: Icon(Icons.badge_outlined)),
+            Tab(text: "PRIVACY", icon: Icon(Icons.visibility_outlined)),
             Tab(text: "SECURITY", icon: Icon(Icons.lock_outline)),
           ],
         ),
@@ -184,11 +240,20 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
                 if (_nameController.text.isEmpty) _nameController.text = data['username'] ?? "";
                 if (_schoolController.text.isEmpty) _schoolController.text = data['school'] ?? "";
                 if (_gradeController.text.isEmpty) _gradeController.text = data['grade'] ?? "";
+                if (_userTagController.text.isEmpty) {
+                  _userTagController.text = data['user_tag'] ?? "${data['username'] ?? 'user'}${DateTime.now().millisecondsSinceEpoch.toString().substring(9)}";
+                }
+                
+                // Initialize visibility if not set
+                if (data['leaderboard_visibility'] != null) {
+                   _visibility = data['leaderboard_visibility'];
+                }
 
                 return TabBarView(
                   controller: _tabController,
                   children: [
                     _buildProfileTab(data, themeYellow, deepNavy),
+                    _buildPrivacyTab(themeYellow, deepNavy),
                     _buildSecurityTab(themeYellow, deepNavy),
                   ],
                 );
@@ -242,12 +307,72 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
 
           // --- ALL FIELDS IN SAME STYLE ---
           _buildField("USERNAME", _nameController),
-          _buildField("SCHOOL NAME", _schoolController),
+          _buildSchoolAutocomplete(),
           _buildField("GRADE (E.G. 8TH)", _gradeController),
 
           const SizedBox(height: 30),
           _buildActionBtn("SAVE PROFILE INFO", _saveGeneralInfo, yellow, navy),
         ],
+      ),
+    );
+  }
+
+  Widget _buildPrivacyTab(Color yellow, Color navy) {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(25),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text("LEADERBOARD VISIBILITY", style: lexendStyle(size: 14, color: Colors.white70, weight: FontWeight.bold)),
+          const SizedBox(height: 15),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(4),
+            decoration: BoxDecoration(
+              color: Colors.white.withOpacity(0.05),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Wrap(
+              alignment: WrapAlignment.center,
+              children: [
+                _buildSegment('global', 'GLOBAL', Icons.public),
+                _buildSegment('school', 'SCHOOL', Icons.school),
+                _buildSegment('hidden', 'HIDDEN', Icons.visibility_off),
+              ],
+            ),
+          ),
+          const SizedBox(height: 30),
+          Text("FRIEND TAG", style: lexendStyle(size: 14, color: Colors.white70, weight: FontWeight.bold)),
+          const SizedBox(height: 10),
+          Text("Share this tag with friends so they can add you to their leaderboard.", style: lexendStyle(size: 11, color: Colors.white54)),
+          const SizedBox(height: 15),
+          _buildField("USER TAG", _userTagController),
+          const SizedBox(height: 40),
+          _buildActionBtn("SAVE SETTINGS", _savePrivacyInfo, yellow, navy),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSegment(String value, String label, IconData icon) {
+    bool isSelected = _visibility == value;
+    return GestureDetector(
+      onTap: () => setState(() => _visibility = value),
+      child: Container(
+        margin: const EdgeInsets.all(4),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        decoration: BoxDecoration(
+          color: isSelected ? const Color(0xFFFFC741) : Colors.transparent,
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, size: 16, color: isSelected ? const Color(0xFF000C2D) : Colors.white54),
+            const SizedBox(width: 8),
+            Text(label, style: lexendStyle(size: 11, color: isSelected ? const Color(0xFF000C2D) : Colors.white54, weight: FontWeight.bold)),
+          ],
+        ),
       ),
     );
   }
@@ -264,6 +389,72 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
           const SizedBox(height: 30),
           _buildActionBtn("UPDATE PASSWORD", _updatePassword, yellow, navy),
         ],
+      ),
+    );
+  }
+
+  Widget _buildSchoolAutocomplete() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 10),
+      child: Autocomplete<String>(
+        optionsBuilder: (TextEditingValue textEditingValue) {
+          if (textEditingValue.text.isEmpty) {
+            return const Iterable<String>.empty();
+          }
+          return _schoolOptions.where((String option) {
+            return option.toLowerCase().contains(textEditingValue.text.toLowerCase());
+          });
+        },
+        onSelected: (String selection) {
+          _schoolController.text = selection;
+        },
+        fieldViewBuilder: (context, controller, focusNode, onFieldSubmitted) {
+          // Sync controllers
+          if (controller.text.isEmpty && _schoolController.text.isNotEmpty) {
+            controller.text = _schoolController.text;
+          }
+          controller.addListener(() {
+            _schoolController.text = controller.text;
+          });
+          return TextField(
+            controller: controller,
+            focusNode: focusNode,
+            style: lexendStyle(),
+            decoration: InputDecoration(
+              labelText: "SCHOOL NAME",
+              labelStyle: lexendStyle(size: 10, color: Colors.white38),
+              filled: true,
+              fillColor: Colors.white.withOpacity(0.05),
+              border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide.none),
+              contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
+            ),
+          );
+        },
+        optionsViewBuilder: (context, onSelected, options) {
+          return Align(
+            alignment: Alignment.topLeft,
+            child: Material(
+              color: const Color(0xFF000C2D),
+              elevation: 4.0,
+              borderRadius: BorderRadius.circular(10),
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxHeight: 200, maxWidth: 300),
+                child: ListView.builder(
+                  padding: EdgeInsets.zero,
+                  shrinkWrap: true,
+                  itemCount: options.length,
+                  itemBuilder: (BuildContext context, int index) {
+                    final String option = options.elementAt(index);
+                    return ListTile(
+                      title: Text(option, style: lexendStyle(size: 12)),
+                      onTap: () => onSelected(option),
+                    );
+                  },
+                ),
+              ),
+            ),
+          );
+        },
       ),
     );
   }

@@ -1,5 +1,6 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'dart:io';
+import 'dart:math';
 
 class SupaService {
   static final _supabase = Supabase.instance.client;
@@ -59,13 +60,91 @@ class SupaService {
     await _supabase.auth.signOut();
   }
 
-  // 7. Update Username
+  // 7. Update Username (Legacy, maybe not used)
   static Future<void> updateUsername(String newUsername) async {
     final user = _supabase.auth.currentUser;
     if (user != null) {
       await _supabase.from('profiles').update({
-        'display_name': newUsername, // Ensure your SQL column is named display_name
+        'username': newUsername, 
       }).eq('id', user.id);
     }
+  }
+
+  // 8. Generate Unique User Tag
+  static Future<String> generateUniqueTag(String baseName) async {
+    final random = Random();
+    String tag = '';
+    bool isUnique = false;
+    int attempts = 0;
+
+    baseName = baseName.replaceAll(RegExp(r'[^a-zA-Z0-9]'), '').toLowerCase();
+    if (baseName.isEmpty) baseName = 'user';
+    if (baseName.length > 10) baseName = baseName.substring(0, 10);
+
+    while (!isUnique && attempts < 10) {
+      final suffix = random.nextInt(9000) + 1000; 
+      tag = '$baseName$suffix';
+      
+      final res = await _supabase.from('profiles').select('id').eq('user_tag', tag).maybeSingle();
+      if (res == null) {
+        isUnique = true;
+      }
+      attempts++;
+    }
+    return isUnique ? tag : '${baseName}_${DateTime.now().millisecondsSinceEpoch}';
+  }
+
+  // 9. Fetch Schools
+  static Future<List<String>> getSchools() async {
+    final res = await _supabase.from('schools').select('school_name').order('school_name');
+    return (res as List).map((row) => row['school_name'] as String).toList();
+  }
+
+  // 10. Update Privacy Settings
+  static Future<void> updatePrivacySettings({required String visibility, required String userTag}) async {
+    final user = _supabase.auth.currentUser;
+    if (user != null) {
+      await _supabase.from('profiles').update({
+        'leaderboard_visibility': visibility,
+        'user_tag': userTag,
+      }).eq('id', user.id);
+    }
+  }
+
+  // 11. Send Friend Request (by ID)
+  static Future<void> sendFriendRequestById(String targetId) async {
+    final myId = _supabase.auth.currentUser!.id;
+    if (myId == targetId) throw Exception("You cannot add yourself.");
+    
+    // Check if already friends or pending
+    final existing = await _supabase.from('friendships').select().or('and(requester_id.eq.$myId,addressee_id.eq.$targetId),and(requester_id.eq.$targetId,addressee_id.eq.$myId)').maybeSingle();
+    if (existing != null) throw Exception("Friendship or request already exists.");
+
+    await _supabase.from('friendships').insert({
+      'requester_id': myId,
+      'addressee_id': targetId,
+    });
+  }
+
+  // 12. Send Friend Request (by Tag)
+  static Future<void> sendFriendRequestByTag(String tag) async {
+    final res = await _supabase.from('profiles').select('id').eq('user_tag', tag).maybeSingle();
+    if (res == null) throw Exception("User tag not found.");
+    await sendFriendRequestById(res['id'] as String);
+  }
+
+  // 13. Accept Friend Request
+  static Future<void> acceptFriendRequest(String friendshipId) async {
+    await _supabase.from('friendships').update({'status': 'accepted'}).eq('id', friendshipId);
+  }
+
+  // 14. Reject/Remove Friend
+  static Future<void> removeOrRejectFriend(String friendshipId) async {
+    await _supabase.from('friendships').delete().eq('id', friendshipId);
+  }
+
+  // 15. Stream Friendships
+  static Stream<List<Map<String, dynamic>>> getFriendshipsStream() {
+    return _supabase.from('friendships').stream(primaryKey: ['id']);
   }
 }
