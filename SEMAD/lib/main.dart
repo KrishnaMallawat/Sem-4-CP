@@ -12,6 +12,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:mathquest/profile_screen.dart';
 import 'package:mathquest/ui_widgets.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
+
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
@@ -21,8 +22,6 @@ void main() async {
     url: dotenv.env['SUPABASE_URL']!,
     anonKey: dotenv.env['SUPABASE_ANON_KEY']!,
   );
-
-  await SettingsService.init();
 
   runApp(const MathQuestApp());
 }
@@ -116,27 +115,20 @@ class HomeGridScreen extends StatelessWidget {
 
     return Scaffold(
       backgroundColor: deepNavy,
-      // THIS APPBAR KEEPS THE MENU AND XP IN ONE ROW
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
         toolbarHeight: 70,
-
-        // NO MENU DRAWER NOW, JUST A LOGO
         leading: const Icon(Icons.calculate_rounded, color: themeYellow, size: 28),
-
-        // 2. THE XP BOX (RIGHT SIDE)
         actions: [
-          // 2. ACHIEVEMENTS ICON
           IconButton(
             icon: const Icon(Icons.verified_outlined, color: Colors.cyanAccent, size: 24),
-            onPressed: () => _showAchievements(context), // Opens a small tab
+            onPressed: () => _showAchievements(context),
           ),
-
           StreamBuilder(
             stream: supabase
                 .from('profiles')
-                .stream(primaryKey: ['id']) // Tells Supabase to watch this row
+                .stream(primaryKey: ['id'])
                 .eq('id', supabase.auth.currentUser!.id),
             builder: (context, snapshot) {
               int xpValue = 0;
@@ -176,9 +168,6 @@ class HomeGridScreen extends StatelessWidget {
           ),
         ],
       ),
-
-      // NO DRAWER
-
       body: Stack(
         children: [
           Positioned.fill(child: CustomPaint(painter: GridPainter())),
@@ -220,23 +209,15 @@ class HomeGridScreen extends StatelessWidget {
     );
   }
 
-
-
-  void _showInstructions(BuildContext context) {
+  void _showAchievements(BuildContext context) {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
         backgroundColor: const Color(0xFF000C2D),
-        title: Text("HOW TO PLAY", style: GoogleFonts.lexend(color: const Color(0xFFFFC741))),
-        content: Text(
-          "Select a module to start your training. Complete equations to earn XP and level up your adventurer!",
-          style: GoogleFonts.lexend(color: Colors.white70),
-        ),
+        title: Text("ACHIEVEMENTS", style: GoogleFonts.lexend(color: Colors.white, fontWeight: FontWeight.bold)),
+        content: Text("Visual Badge Gallery coming in the next update!", style: GoogleFonts.lexend(color: Colors.white70)),
         actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text("GOT IT"),
-          )
+          TextButton(onPressed: () => Navigator.pop(context), child: const Text("OK"))
         ],
       ),
     );
@@ -455,64 +436,10 @@ class LeaderboardScreen extends StatefulWidget {
 class _LeaderboardScreenState extends State<LeaderboardScreen> {
   String _globalSubFilter = 'individuals'; // 'individuals' or 'schools'
 
-  @override
-  Widget build(BuildContext context) {
-    const Color deepNavy = Color(0xFF000C2D);
-    const Color themeYellow = Color(0xFFFFC741);
-    const Color petalPink = Color(0xFFFF80AB);
-
-    return DefaultTabController(
-      length: 3,
-      child: Scaffold(
-        backgroundColor: deepNavy,
-        appBar: AppBar(
-          backgroundColor: deepNavy,
-          elevation: 0,
-          title: Text(
-            "RANKINGS",
-            style: GoogleFonts.lexend(
-              color: Colors.white,
-              fontSize: 18,
-              fontWeight: FontWeight.w800,
-              letterSpacing: 1.5,
-            ),
-          ),
-          bottom: TabBar(
-            indicatorColor: themeYellow,
-            labelColor: themeYellow,
-            unselectedLabelColor: Colors.white54,
-            labelStyle: GoogleFonts.lexend(fontWeight: FontWeight.bold, fontSize: 12),
-            tabs: const [
-              Tab(text: "GLOBAL"),
-              Tab(text: "SCHOOL"),
-              Tab(text: "FRIENDS"),
-            ],
-          ),
-        ),
-        body: Stack(
-          children: [
-            Positioned.fill(
-              child: Opacity(
-                opacity: 0.05,
-                child: CustomPaint(painter: MagicGridPainter()),
-              ),
-            ),
-            TabBarView(
-              children: [
-                _buildGlobalTab(themeYellow, petalPink),
-                _buildLeaderboardTab(themeYellow, petalPink, filter: 'school'),
-                _buildFriendsTab(context, themeYellow, petalPink),
-              ],
-            ),
-          ],
-        ),
-      ),
-    );
   Widget _buildGlobalTab(Color yellow, Color pink) {
     return Column(
       children: [
         const SizedBox(height: 15),
-        // Sub-toggle
         Container(
           margin: const EdgeInsets.symmetric(horizontal: 40),
           decoration: BoxDecoration(
@@ -606,6 +533,61 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
           },
         );
       },
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    const Color deepNavy = Color(0xFF000C2D);
+    const Color themeYellow = Color(0xFFFFC741);
+    const Color petalPink = Color(0xFFFF80AB);
+
+    return DefaultTabController(
+      length: 3,
+      child: Scaffold(
+        backgroundColor: deepNavy,
+        appBar: AppBar(
+          backgroundColor: deepNavy,
+          elevation: 0,
+          title: Text(
+            "RANKINGS",
+            style: GoogleFonts.lexend(
+              color: Colors.white,
+              fontSize: 18,
+              fontWeight: FontWeight.w800,
+              letterSpacing: 1.5,
+            ),
+          ),
+          bottom: TabBar(
+            indicatorColor: themeYellow,
+            labelColor: themeYellow,
+            unselectedLabelColor: Colors.white54,
+            labelStyle: GoogleFonts.lexend(fontWeight: FontWeight.bold, fontSize: 12),
+            tabs: const [
+              Tab(text: "GLOBAL"),
+              Tab(text: "SCHOOL"),
+              Tab(text: "FRIENDS"),
+            ],
+          ),
+        ),
+        body: Stack(
+          children: [
+            Positioned.fill(
+              child: Opacity(
+                opacity: 0.05,
+                child: CustomPaint(painter: MagicGridPainter()),
+              ),
+            ),
+            TabBarView(
+              children: [
+                _buildGlobalTab(themeYellow, petalPink),
+                _buildLeaderboardTab(themeYellow, petalPink, filter: 'school'),
+                _buildFriendsTab(context, themeYellow, petalPink),
+              ],
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
@@ -973,57 +955,6 @@ void _showAddFriendDialog(BuildContext context) {
         ],
       );
     }
-  );
-}
-
-void _showAchievements(BuildContext context) {
-  showModalBottomSheet(
-    context: context,
-    backgroundColor: const Color(0xFF000C2D), // Deep Navy
-    shape: const RoundedRectangleBorder(borderRadius: BorderRadius.zero),
-    builder: (context) {
-      return StreamBuilder(
-        stream: supabase.from('profiles').stream(primaryKey: ['id']).eq('id', supabase.auth.currentUser!.id),
-        builder: (context, snapshot) {
-          int currentXP = 0;
-          if (snapshot.hasData && snapshot.data!.isNotEmpty) {
-            currentXP = snapshot.data!.first['xp'] ?? 0;
-          }
-
-          return Container(
-            padding: const EdgeInsets.all(24),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  "ADVENTURER BADGES",
-                  style: GoogleFonts.lexend(
-                    color: const Color(0xFFFFC741),
-                    fontSize: 20,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                const SizedBox(height: 5),
-                const Divider(color: Colors.white10, thickness: 0.5),
-                const SizedBox(height: 15),
-
-                // Achievement List
-                _badgeRow("NOVICE TRADER", "Reach 100 XP", currentXP >= 100, Icons.auto_awesome),
-                _badgeRow("MATH WARRIOR", "Reach 500 XP", currentXP >= 500, Icons.shield_rounded),
-                _badgeRow("NUMERICAL NINJA", "Reach 1000 XP", currentXP >= 1000, Icons.bolt_rounded),
-
-                const SizedBox(height: 20),
-                TextButton(
-                  onPressed: () => Navigator.pop(context),
-                  child: Text("BACK TO QUEST", style: GoogleFonts.lexend(color: const Color(0xFFFFC741))),
-                ),
-                const SizedBox(height: 60),
-              ],
-            ),
-          );
-        },
-      );
-    },
   );
 }
 

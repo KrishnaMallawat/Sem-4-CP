@@ -5,6 +5,7 @@ import 'dart:io';
 import 'dart:math' as math;
 import 'package:image_picker/image_picker.dart';
 import 'package:mathquest/ui_widgets.dart';
+import 'package:mathquest/supa.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -16,27 +17,20 @@ class ProfileScreen extends StatefulWidget {
 class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProviderStateMixin {
   late TabController _tabController;
   final _supabase = Supabase.instance.client;
+  bool _isLoading = false;
   bool _isUploading = false;
+  bool _isInitialDataLoaded = false;
   List<String> _schoolOptions = [];
   String _visibility = 'global';
+  
   final _userTagController = TextEditingController();
-
-  // Controllers
-  final _nameController = TextEditingController(); // Added for Username
+  final _nameController = TextEditingController(); 
   final _schoolController = TextEditingController();
   final _gradeController = TextEditingController();
   final _passController = TextEditingController();
   final _confirmPassController = TextEditingController();
-
-  bool _isLoading = false;
-  bool _isInitialDataLoaded = false;
   
-  // Settings
-  bool _soundEnabled = true;
-  bool _hapticsEnabled = true;
-
-  // Domain Mapping for Radar Chart
-  Map<String, double> _domainScores = {
+  final Map<String, double> _domainScores = {
     'Arithmetic': 0,
     'Fractions': 0,
     'Geometry': 0,
@@ -47,17 +41,11 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 5, vsync: this); // Increased to 5 for Settings
+    _tabController = TabController(length: 4, vsync: this); 
     _loadSchools();
-    _loadSettings();
   }
 
-  Future<void> _loadSettings() async {
-    setState(() {
-      _soundEnabled = SettingsService.soundEnabled;
-      _hapticsEnabled = SettingsService.hapticsEnabled;
-    });
-  }
+
 
   Future<void> _loadSchools() async {
     try {
@@ -243,7 +231,6 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
             Tab(text: "STATS", icon: Icon(Icons.bar_chart_outlined)),
             Tab(text: "PRIVACY", icon: Icon(Icons.visibility_outlined)),
             Tab(text: "SECURITY", icon: Icon(Icons.lock_outline)),
-            Tab(text: "SETTINGS", icon: Icon(Icons.settings_outlined)),
           ],
         ),
       ),
@@ -290,7 +277,6 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
                     _buildStatsTab(themeYellow, deepNavy),
                     _buildPrivacyTab(themeYellow, deepNavy),
                     _buildSecurityTab(themeYellow, deepNavy),
-                    _buildSettingsTab(themeYellow, deepNavy),
                   ],
                 );
               },
@@ -529,33 +515,33 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
   }
 
   Widget _buildStatsTab(Color yellow, Color navy) {
-    return FutureBuilder(
-      future: Future.wait([
-        _supabase.from('user_game_stats').select().eq('user_id', _supabase.auth.currentUser!.id),
-        _supabase.from('game_sessions').select().eq('user_id', _supabase.auth.currentUser!.id).order('played_at', ascending: false).limit(5),
-      ]),
-      builder: (context, AsyncSnapshot<List<dynamic>> snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
+    return StreamBuilder(
+      stream: _supabase.from('game_sessions').stream(primaryKey: ['id']).eq('user_id', _supabase.auth.currentUser!.id).order('played_at', ascending: false),
+      builder: (context, snapshot) {
+        if (!snapshot.hasData) {
           return Center(child: CircularProgressIndicator(color: yellow));
         }
         
-        final stats = snapshot.data?[0] as List? ?? [];
-        final history = snapshot.data?[1] as List? ?? [];
-
-        // Calculate domain scores for radar chart
-        for (var stat in stats) {
-          String game = stat['game_name'];
-          double score = (stat['max_score'] ?? 0).toDouble();
-          if (game == 'Bazaar Bill') _domainScores['Arithmetic'] = score;
-          if (game == 'Fraction Fields') _domainScores['Fractions'] = score;
-          if (game == 'Shape Surge') _domainScores['Geometry'] = score;
-          if (game == 'Formula Flash') _domainScores['Logic'] = score;
-          if (game == 'Quick Tick') _domainScores['Speed'] = score;
+        final sessions = snapshot.data as List<Map<String, dynamic>>;
+        
+        // Reset scores
+        _domainScores.updateAll((k, v) => 0.0);
+        
+        // Aggregate - Use Max Score per game as domain proficiency
+        for (var s in sessions) {
+          String game = s['game_name'] ?? '';
+          double score = (s['score'] ?? 0).toDouble();
+          
+          if (game == 'Bazaar Bill' && score > _domainScores['Arithmetic']!) _domainScores['Arithmetic'] = score;
+          if (game == 'Fraction Fields' && score > _domainScores['Fractions']!) _domainScores['Fractions'] = score;
+          if (game == 'Shape Surge' && score > _domainScores['Geometry']!) _domainScores['Geometry'] = score;
+          if (game == 'Formula Flash' && score > _domainScores['Logic']!) _domainScores['Logic'] = score;
+          if (game == 'Quick Tick' && score > _domainScores['Speed']!) _domainScores['Speed'] = score;
         }
 
         // Find weakest domain
         String weakest = 'Arithmetic';
-        double minVal = 999;
+        double minVal = 999999;
         _domainScores.forEach((k, v) {
           if (v < minVal) {
             minVal = v;
@@ -570,6 +556,8 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
           'Logic': 'Match patterns in Formula Flash.',
           'Speed': 'Race against time in Quick Tick.',
         };
+
+        final history = sessions.take(5).toList();
 
         return SingleChildScrollView(
           padding: const EdgeInsets.all(20),
@@ -664,83 +652,6 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
       },
     );
   }
-
-  Widget _buildSettingsTab(Color yellow, Color navy) {
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(25),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text("GAME PREFERENCES", style: lexendStyle(size: 14, color: Colors.white70, weight: FontWeight.bold)),
-          const SizedBox(height: 20),
-          _buildToggleSetting("SOUND EFFECTS", "Enable immersive game sounds", _soundEnabled, (v) async {
-            setState(() => _soundEnabled = v);
-            await SettingsService.setSound(v);
-          }, yellow),
-          _buildToggleSetting("HAPTIC FEEDBACK", "Tactile vibrations during play", _hapticsEnabled, (v) async {
-            setState(() => _hapticsEnabled = v);
-            await SettingsService.setHaptics(v);
-          }, yellow),
-          
-          const SizedBox(height: 40),
-          Text("ABOUT MATHQUEST", style: lexendStyle(size: 14, color: Colors.white70, weight: FontWeight.bold)),
-          const SizedBox(height: 15),
-          ListTile(
-            contentPadding: EdgeInsets.zero,
-            title: Text("Version", style: lexendStyle()),
-            trailing: Text("1.0.0", style: lexendStyle(color: Colors.white38)),
-          ),
-          ListTile(
-            contentPadding: EdgeInsets.zero,
-            title: Text("Clear Game Cache", style: lexendStyle()),
-            trailing: Icon(Icons.chevron_right, color: Colors.white38),
-            onTap: () {},
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildToggleSetting(String title, String subtitle, bool value, Function(bool) onChanged, Color yellow) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 15),
-      padding: const EdgeInsets.all(15),
-      decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.04),
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Row(
-        children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(title, style: lexendStyle(weight: FontWeight.bold)),
-                Text(subtitle, style: lexendStyle(size: 11, color: Colors.white38)),
-              ],
-            ),
-          ),
-          Switch(
-            value: value,
-            onChanged: onChanged,
-            activeColor: yellow,
-            activeTrackColor: yellow.withOpacity(0.3),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _statCol(String label, String value) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(label, style: GoogleFonts.lexend(color: Colors.white54, fontSize: 10, fontWeight: FontWeight.bold)),
-        const SizedBox(height: 4),
-        Text(value, style: GoogleFonts.lexend(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
-      ],
-    );
-  }
 }
 
 class RadarChartPainter extends CustomPainter {
@@ -799,10 +710,17 @@ class RadarChartPainter extends CustomPainter {
         center.dy + (radius + 20) * math.sin(angle) - (textPainter.height / 2),
       );
       textPainter.paint(canvas, labelOffset);
+    }
 
-      // Score point
-      double score = (scores[domains[i]] ?? 0).clamp(0, 500); // Scale: max 500 XP per domain for chart
-      double normalized = (score / 500).clamp(0.1, 1.0); 
+    // Normalize scores relative to a realistic "Mastery" level (e.g., 200 XP)
+    // If the user has more, the chart just stays at the outer ring.
+    const double masteryLevel = 200.0;
+    
+    for (int i = 0; i < domains.length; i++) {
+      double score = (scores[domains[i]] ?? 0).clamp(0, masteryLevel);
+      double normalized = (score / masteryLevel).clamp(0.1, 1.0);
+      
+      double angle = (i * 2 * math.pi / domains.length) - (math.pi / 2);
       points.add(Offset(
         center.dx + radius * normalized * math.cos(angle),
         center.dy + radius * normalized * math.sin(angle),

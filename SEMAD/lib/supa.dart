@@ -159,38 +159,4 @@ class SupaService {
   }
 }
 
-class SettingsService {
-  static SharedPreferences? _prefs;
 
-  static Future<void> init() async {
-    _prefs = await SharedPreferences.getInstance();
-  }
-
-  static bool get soundEnabled => _prefs?.getBool('sound_enabled') ?? true;
-  static bool get hapticsEnabled => _prefs?.getBool('haptics_enabled') ?? true;
-
-  static Future<void> setSound(bool val) async {
-    await _prefs?.setBool('sound_enabled', val);
-  }
-
-  static Future<void> setHaptics(bool val) async {
-    await _prefs?.setBool('haptics_enabled', val);
-  }
-
-  static void triggerHaptic(HapticType type) {
-    if (!hapticsEnabled) return;
-    switch (type) {
-      case HapticType.success:
-        HapticFeedback.lightImpact();
-        break;
-      case HapticType.error:
-        HapticFeedback.heavyImpact();
-        break;
-      case HapticType.selection:
-        HapticFeedback.selectionClick();
-        break;
-    }
-  }
-}
-
-enum HapticType { success, error, selection }

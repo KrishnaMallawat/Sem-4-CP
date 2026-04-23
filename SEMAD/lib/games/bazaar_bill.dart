@@ -422,7 +422,6 @@ class _BazaarBillGameState extends State<BazaarBillGame> {
   }
 
   void _showSuccessDialog() {
-    SettingsService.triggerHaptic(HapticType.success);
     showDialog(
       context: context,
       barrierDismissible: false,
