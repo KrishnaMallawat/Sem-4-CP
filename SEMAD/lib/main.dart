@@ -53,8 +53,48 @@ class MathQuestApp extends StatelessWidget {
   }
 }
 
-class GanitControlCenter extends StatelessWidget {
+class GanitControlCenter extends StatefulWidget {
   const GanitControlCenter({super.key});
+
+  @override
+  State<GanitControlCenter> createState() => _GanitControlCenterState();
+}
+
+class _GanitControlCenterState extends State<GanitControlCenter> {
+  int _currentIndex = 0;
+
+  late final List<Widget> _screens = [
+    const HomeGridScreen(),
+    const LeaderboardScreen(),
+    const ProfileScreen(),
+  ];
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: const Color(0xFF000C2D),
+      body: IndexedStack(
+        index: _currentIndex,
+        children: _screens,
+      ),
+      bottomNavigationBar: BottomNavigationBar(
+        backgroundColor: const Color(0xFF000C2D),
+        selectedItemColor: const Color(0xFFFFC741),
+        unselectedItemColor: Colors.white54,
+        currentIndex: _currentIndex,
+        onTap: (index) => setState(() => _currentIndex = index),
+        items: const [
+          BottomNavigationBarItem(icon: Icon(Icons.gamepad_rounded), label: "PLAY"),
+          BottomNavigationBarItem(icon: Icon(Icons.emoji_events_rounded), label: "RANKINGS"),
+          BottomNavigationBarItem(icon: Icon(Icons.person_rounded), label: "PROFILE"),
+        ],
+      ),
+    );
+  }
+}
+
+class HomeGridScreen extends StatelessWidget {
+  const HomeGridScreen({super.key});
 
   final List<Map<String, String>> games = const [
     {"title": "BAZAAR BILL", "img": "assets/1.png"},
@@ -80,19 +120,20 @@ class GanitControlCenter extends StatelessWidget {
         elevation: 0,
         toolbarHeight: 70,
 
-        // 1. THE MENU (LEFT SIDE)
-        leading: Builder(
-          builder: (context) => IconButton(
-            icon: const Icon(Icons.menu_rounded, color: Colors.white, size: 25),
-            onPressed: () => Scaffold.of(context).openDrawer(),
-          ),
-        ),
+        // NO MENU DRAWER NOW, JUST A LOGO
+        leading: const Icon(Icons.calculate_rounded, color: themeYellow, size: 28),
 
         // 2. THE XP BOX (RIGHT SIDE)
         actions: [
+          // 1. LOGOUT
           IconButton(
-            icon: const Icon(Icons.emoji_events_outlined, color: Color(0xFFFFC741), size: 24),
-            onPressed: () => _showLeaderboard(context), // Opens a small tab
+            icon: const Icon(Icons.logout_rounded, color: Colors.redAccent, size: 24),
+            onPressed: () async {
+              await SupaService.logout();
+              if (context.mounted) {
+                Navigator.pushNamedAndRemoveUntil(context, '/login', (route) => false);
+              }
+            },
           ),
 
           // 2. ACHIEVEMENTS ICON
@@ -145,47 +186,7 @@ class GanitControlCenter extends StatelessWidget {
         ],
       ),
 
-      drawer: Drawer(
-        backgroundColor: deepNavy,
-        shape: const RoundedRectangleBorder(
-          borderRadius: BorderRadius.zero,
-        ),
-        child: Column(
-          children: [
-            // Drawer Header with Image
-            DrawerHeader(
-              padding: EdgeInsets.zero,
-              margin: EdgeInsets.zero,
-              decoration: const BoxDecoration(
-                border: Border(bottom: BorderSide(color: Colors.transparent, width: 0)),
-                image: DecorationImage(
-                  image: AssetImage("assets/drawer.png"),
-                  fit: BoxFit.cover,
-                ),
-              ),
-              child: const SizedBox(height: 160, width: double.infinity),
-            ),
-            const SizedBox(height: 10),
-            _buildDrawerItem(Icons.settings, "Profile & Settings", () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (context) => const ProfileScreen()),
-              );
-            }),
-            _buildDrawerItem(Icons.info_outline, "Instructions", () {
-              _showInstructions(context);
-            }),
-            const Spacer(),
-            _buildDrawerItem(Icons.logout_rounded, "LOG OUT", () async {
-              await SupaService.logout();
-              if (context.mounted) {
-                Navigator.pushNamedAndRemoveUntil(context, '/login', (route) => false);
-              }
-            }, color: Colors.redAccent),
-            const SizedBox(height: 60),
-          ],
-        ),
-      ),
+      // NO DRAWER
 
       body: Stack(
         children: [
@@ -228,20 +229,7 @@ class GanitControlCenter extends StatelessWidget {
     );
   }
 
-  Widget _buildDrawerItem(IconData icon, String title, VoidCallback onTap, {Color color = Colors.white}) {
-    return ListTile(
-      contentPadding: const EdgeInsets.symmetric(horizontal: 24.0),
-      leading: Icon(icon, color: color),
-      title: Text(
-        title,
-        style: GoogleFonts.lexend(
-          color: color,
-          fontWeight: FontWeight.w500,
-        ),
-      ),
-      onTap: onTap,
-    );
-  }
+
 
   void _showInstructions(BuildContext context) {
     showDialog(
@@ -379,6 +367,11 @@ class _GameModuleCardState extends State<GameModuleCard> {
               case "SHAPE SURGE":
                 Navigator.push(context, MaterialPageRoute(builder: (context) => const MathShapeNinjaGame()));
                 break;
+              case "PAIR UP":
+              case "GRID GUARDIAN":
+              case "TARGET BLITZZ":
+                // Handle visually via overlay, don't navigate
+                break;
               default:
                 ScaffoldMessenger.of(context).showSnackBar(
                   SnackBar(content: Text("${widget.title} coming soon!")),
@@ -388,23 +381,40 @@ class _GameModuleCardState extends State<GameModuleCard> {
           child: AnimatedScale(
             scale: _isPressed ? 0.98 : 1.0,
             duration: const Duration(milliseconds: 100),
-            child: Container(
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.zero,
-                image: DecorationImage(
-                  image: AssetImage(widget.imagePath),
-                  fit: BoxFit.cover,
+            child: Stack(
+              fit: StackFit.expand,
+              children: [
+                Container(
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.zero,
+                    image: DecorationImage(
+                      image: AssetImage(widget.imagePath),
+                      fit: BoxFit.cover,
+                    ),
+                  ),
                 ),
-              ),
-              child: Container(
-                decoration: const BoxDecoration(
-                  borderRadius: BorderRadius.zero,
-                  color: Colors.transparent,
-                ),
-                padding: const EdgeInsets.all(20),
-                alignment: Alignment.bottomLeft,
-                child: const SizedBox.shrink(),
-              ),
+                if (widget.title == "PAIR UP" || widget.title == "GRID GUARDIAN" || widget.title == "TARGET BLITZZ")
+                  Container(
+                    color: Colors.black.withOpacity(0.6),
+                    child: Center(
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(Icons.lock_rounded, color: Colors.white54, size: 30),
+                          const SizedBox(height: 5),
+                          Text(
+                            "COMING SOON",
+                            style: GoogleFonts.lexend(
+                              color: Colors.white,
+                              fontWeight: FontWeight.bold,
+                              letterSpacing: 2,
+                            ),
+                          )
+                        ],
+                      ),
+                    ),
+                  )
+              ],
             ),
           ),
         ),
@@ -444,68 +454,63 @@ class NoThumbScrollBehavior extends ScrollBehavior {
   Widget buildScrollbar(context, child, details) => child;
 }
 
-void _showLeaderboard(BuildContext context) {
-  const Color deepNavy = Color(0xFF000C2D);
-  const Color themeYellow = Color(0xFFFFC741);
-  const Color petalPink = Color(0xFFFF80AB);
+class LeaderboardScreen extends StatelessWidget {
+  const LeaderboardScreen({super.key});
 
-  Navigator.push(
-    context,
-    MaterialPageRoute(
-      fullscreenDialog: true,
-      builder: (context) => DefaultTabController(
-        length: 3,
-        child: Scaffold(
+  @override
+  Widget build(BuildContext context) {
+    const Color deepNavy = Color(0xFF000C2D);
+    const Color themeYellow = Color(0xFFFFC741);
+    const Color petalPink = Color(0xFFFF80AB);
+
+    return DefaultTabController(
+      length: 3,
+      child: Scaffold(
+        backgroundColor: deepNavy,
+        appBar: AppBar(
           backgroundColor: deepNavy,
-          appBar: AppBar(
-            backgroundColor: deepNavy,
-            elevation: 0,
-            leading: IconButton(
-              icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white, size: 22),
-              onPressed: () => Navigator.pop(context),
-            ),
-            title: Text(
-              "RANKINGS",
-              style: GoogleFonts.lexend(
-                color: Colors.white,
-                fontSize: 18,
-                fontWeight: FontWeight.w800,
-                letterSpacing: 1.5,
-              ),
-            ),
-            bottom: TabBar(
-              indicatorColor: themeYellow,
-              labelColor: themeYellow,
-              unselectedLabelColor: Colors.white54,
-              labelStyle: GoogleFonts.lexend(fontWeight: FontWeight.bold, fontSize: 12),
-              tabs: const [
-                Tab(text: "GLOBAL"),
-                Tab(text: "SCHOOL"),
-                Tab(text: "FRIENDS"),
-              ],
+          elevation: 0,
+          title: Text(
+            "RANKINGS",
+            style: GoogleFonts.lexend(
+              color: Colors.white,
+              fontSize: 18,
+              fontWeight: FontWeight.w800,
+              letterSpacing: 1.5,
             ),
           ),
-          body: Stack(
-            children: [
-              Positioned.fill(
-                child: Opacity(
-                  opacity: 0.05,
-                  child: CustomPaint(painter: MagicGridPainter()),
-                ),
-              ),
-              TabBarView(
-                children: [
-                  _buildLeaderboardTab(themeYellow, petalPink, filter: 'global'),
-                  _buildLeaderboardTab(themeYellow, petalPink, filter: 'school'),
-                  _buildFriendsTab(context, themeYellow, petalPink),
-                ],
-              ),
+          bottom: TabBar(
+            indicatorColor: themeYellow,
+            labelColor: themeYellow,
+            unselectedLabelColor: Colors.white54,
+            labelStyle: GoogleFonts.lexend(fontWeight: FontWeight.bold, fontSize: 12),
+            tabs: const [
+              Tab(text: "GLOBAL"),
+              Tab(text: "SCHOOL"),
+              Tab(text: "FRIENDS"),
             ],
           ),
         ),
+        body: Stack(
+          children: [
+            Positioned.fill(
+              child: Opacity(
+                opacity: 0.05,
+                child: CustomPaint(painter: MagicGridPainter()),
+              ),
+            ),
+            TabBarView(
+              children: [
+                _buildLeaderboardTab(themeYellow, petalPink, filter: 'global'),
+                _buildLeaderboardTab(themeYellow, petalPink, filter: 'school'),
+                _buildFriendsTab(context, themeYellow, petalPink),
+              ],
+            ),
+          ],
+        ),
       ),
-    ),
-  );
+    );
+  }
 }
 
 Widget _buildLeaderboardTab(Color themeYellow, Color petalPink, {required String filter}) {

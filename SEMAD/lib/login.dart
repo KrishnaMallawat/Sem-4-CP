@@ -23,6 +23,7 @@ class _MathQuestLoginState extends State<MathQuestLogin> {
   final _passwordController = TextEditingController();
   final _gradeController = TextEditingController();
   final _schoolController = TextEditingController();
+  final _usernameController = TextEditingController();
 
   final Color vibrantBlue = const Color(0xFF2196F3);
   final Color deepNavy = const Color(0xFF000C2D);
@@ -45,8 +46,8 @@ class _MathQuestLoginState extends State<MathQuestLogin> {
     setState(() => _isLoading = true);
     try {
       if (_isSignUp) {
-        if (_gradeController.text.trim().isEmpty || _schoolController.text.trim().isEmpty) {
-          _showSnackBar("Please fill in your Grade and School.");
+        if (_usernameController.text.trim().isEmpty || _gradeController.text.trim().isEmpty || _schoolController.text.trim().isEmpty) {
+          _showSnackBar("Please fill in your Username, Grade and School.");
           setState(() => _isLoading = false);
           return;
         }
@@ -58,12 +59,12 @@ class _MathQuestLoginState extends State<MathQuestLogin> {
         );
 
         // 2. GENERATE TAG
-        final baseName = email.split('@').first;
-        final userTag = await SupaService.generateUniqueTag(baseName);
+        final userTag = await SupaService.generateUniqueTag();
 
         // 3. UPDATE PROFILE
         // We pass the data to fill the row created by your SQL trigger
         await Supabase.instance.client.from('profiles').update({
+          'username': _usernameController.text.trim(),
           'grade': _gradeController.text.trim(),
           'school': _schoolController.text.trim(),
           'user_tag': userTag,
@@ -193,6 +194,12 @@ class _MathQuestLoginState extends State<MathQuestLogin> {
 
                       // ADDITIONAL SIGNUP FIELDS
                       if (_isSignUp) ...[
+                        const SizedBox(height: 15),
+                        _buildPillInput(
+                          hint: "Username",
+                          icon: Icons.person_outline,
+                          controller: _usernameController,
+                        ),
                         const SizedBox(height: 15),
                         _buildPillInput(
                           hint: "Grade (e.g. 7th)",

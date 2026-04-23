@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:mathquest/supa.dart';
 import 'dart:async';
 import 'dart:math';
 import 'package:google_fonts/google_fonts.dart';
@@ -181,6 +182,7 @@ class _MathShapeNinjaGameState extends State<MathShapeNinjaGame> with SingleTick
     if (score > 0) {
       try {
         await Supabase.instance.client.rpc('increment_xp', params: {'amount': score});
+        await SupaService.saveGameSession(gameName: 'Shape Surge', score: score, timeSpentSeconds: 60);
       } catch (e) {
         debugPrint("Failed to save XP: $e");
       }

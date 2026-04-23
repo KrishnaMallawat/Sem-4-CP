@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:mathquest/supa.dart';
 import 'dart:async';
 import 'dart:math';
 import 'package:google_fonts/google_fonts.dart';
@@ -73,6 +74,7 @@ class _FormulaFlashGameState extends State<FormulaFlashGame> {
       final user = client.auth.currentUser;
       if (user != null) {
         await client.rpc('increment_xp', params: {'amount': earnedXP});
+        await SupaService.saveGameSession(gameName: 'Formula Flash', score: earnedXP, timeSpentSeconds: timeTaken);
       }
     } catch (e) {
       debugPrint("Supabase XP Sync Error: $e");

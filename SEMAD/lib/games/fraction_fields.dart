@@ -1,6 +1,7 @@
 import 'dart:math';
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:mathquest/supa.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -157,6 +158,7 @@ class _GameScreenState extends State<GameScreen> {
       try {
         final client = Supabase.instance.client;
         await client.rpc('increment_xp', params: {'amount': earnedXP});
+        await SupaService.saveGameSession(gameName: 'Fraction Fields', score: earnedXP, timeSpentSeconds: timeSpent);
       } catch (e) {
         debugPrint("XP Error: $e");
       }

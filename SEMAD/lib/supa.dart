@@ -71,27 +71,18 @@ class SupaService {
   }
 
   // 8. Generate Unique User Tag
-  static Future<String> generateUniqueTag(String baseName) async {
-    final random = Random();
-    String tag = '';
-    bool isUnique = false;
-    int attempts = 0;
-
-    baseName = baseName.replaceAll(RegExp(r'[^a-zA-Z0-9]'), '').toLowerCase();
-    if (baseName.isEmpty) baseName = 'user';
-    if (baseName.length > 10) baseName = baseName.substring(0, 10);
-
-    while (!isUnique && attempts < 10) {
-      final suffix = random.nextInt(9000) + 1000; 
-      tag = '$baseName$suffix';
+  static Future<String> generateUniqueTag() async {
+    const chars = 'abcdefghijklmnopqrstuvwxyz0123456789';
+    final rnd = Random();
+    
+    while (true) {
+      String tag = String.fromCharCodes(Iterable.generate(5, (_) => chars.codeUnitAt(rnd.nextInt(chars.length))));
       
-      final res = await _supabase.from('profiles').select('id').eq('user_tag', tag).maybeSingle();
-      if (res == null) {
-        isUnique = true;
+      final existing = await _supabase.from('profiles').select('id').eq('user_tag', tag).maybeSingle();
+      if (existing == null) {
+        return tag; // Tag is unique!
       }
-      attempts++;
     }
-    return isUnique ? tag : '${baseName}_${DateTime.now().millisecondsSinceEpoch}';
   }
 
   // 9. Fetch Schools
@@ -146,5 +137,22 @@ class SupaService {
   // 15. Stream Friendships
   static Stream<List<Map<String, dynamic>>> getFriendshipsStream() {
     return _supabase.from('friendships').stream(primaryKey: ['id']);
+  }
+
+  // 16. Save Game Session
+  static Future<void> saveGameSession({
+    required String gameName,
+    required int score,
+    required int timeSpentSeconds,
+  }) async {
+    final user = _supabase.auth.currentUser;
+    if (user != null) {
+      await _supabase.from('game_sessions').insert({
+        'user_id': user.id,
+        'game_name': gameName,
+        'score': score,
+        'time_spent_seconds': timeSpentSeconds,
+      });
+    }
   }
 }

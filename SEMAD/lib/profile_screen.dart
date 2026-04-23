@@ -32,7 +32,7 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 3, vsync: this);
+    _tabController = TabController(length: 4, vsync: this);
     _loadSchools();
   }
 
@@ -206,6 +206,7 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
           labelStyle: lexendStyle(weight: FontWeight.bold, size: 10),
           tabs: const [
             Tab(text: "PROFILE", icon: Icon(Icons.badge_outlined)),
+            Tab(text: "STATS", icon: Icon(Icons.bar_chart_outlined)),
             Tab(text: "PRIVACY", icon: Icon(Icons.visibility_outlined)),
             Tab(text: "SECURITY", icon: Icon(Icons.lock_outline)),
           ],
@@ -253,6 +254,7 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
                   controller: _tabController,
                   children: [
                     _buildProfileTab(data, themeYellow, deepNavy),
+                    _buildStatsTab(themeYellow),
                     _buildPrivacyTab(themeYellow, deepNavy),
                     _buildSecurityTab(themeYellow, deepNavy),
                   ],
@@ -489,6 +491,107 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
       ),
       onPressed: onPress,
       child: Text(label, style: lexendStyle(color: navy, weight: FontWeight.bold)),
+    );
+  }
+
+  Widget _buildStatsTab(Color yellow) {
+    return FutureBuilder(
+      future: _supabase.from('user_game_stats').select().eq('user_id', _supabase.auth.currentUser!.id),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return Center(child: CircularProgressIndicator(color: yellow));
+        }
+        if (snapshot.hasError || !snapshot.hasData) {
+          return Center(
+            child: Text(
+              "No stats available right now.",
+              style: GoogleFonts.lexend(color: Colors.white54),
+            ),
+          );
+        }
+
+        final stats = snapshot.data as List;
+        if (stats.isEmpty) {
+          return Center(
+            child: Text(
+              "Play some games to see your stats!",
+              style: GoogleFonts.lexend(color: Colors.white54),
+            ),
+          );
+        }
+
+        return ListView.builder(
+          padding: const EdgeInsets.all(20),
+          physics: const BouncingScrollPhysics(),
+          itemCount: stats.length,
+          itemBuilder: (context, index) {
+            final stat = stats[index];
+            return Container(
+              margin: const EdgeInsets.only(bottom: 15),
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                color: Colors.white.withOpacity(0.04),
+                borderRadius: BorderRadius.circular(15),
+                border: Border.all(color: Colors.white10),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        stat['game_name'],
+                        style: GoogleFonts.lexend(
+                          color: yellow,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 18,
+                        ),
+                      ),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: yellow.withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(10)
+                        ),
+                        child: Text(
+                          "Last: ${stat['last_score']}",
+                          style: GoogleFonts.lexend(color: yellow, fontWeight: FontWeight.bold, fontSize: 12),
+                        ),
+                      )
+                    ],
+                  ),
+                  const SizedBox(height: 15),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      _statCol("GAMES PLAYED", "${stat['games_played']}"),
+                      _statCol("AVG SCORE", "${stat['avg_score']}"),
+                      _statCol("BEST SCORE", "${stat['max_score']}"),
+                    ],
+                  ),
+                  const SizedBox(height: 15),
+                  Text(
+                    "Last Played: ${DateTime.parse(stat['last_played']).toLocal().toString().split('.')[0]}",
+                    style: GoogleFonts.lexend(color: Colors.white38, fontSize: 10),
+                  )
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Widget _statCol(String label, String value) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(label, style: GoogleFonts.lexend(color: Colors.white54, fontSize: 10, fontWeight: FontWeight.bold)),
+        const SizedBox(height: 4),
+        Text(value, style: GoogleFonts.lexend(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
+      ],
     );
   }
 }

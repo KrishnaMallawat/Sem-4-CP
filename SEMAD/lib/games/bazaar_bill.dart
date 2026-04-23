@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:mathquest/supa.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'dart:async';
 import 'dart:math';
@@ -467,6 +468,11 @@ class _BazaarBillGameState extends State<BazaarBillGame> {
   }
 
   void _showFinalResults() {
+    SupaService.saveGameSession(
+      gameName: 'Bazaar Bill',
+      score: sessionXP,
+      timeSpentSeconds: 240,
+    );
     showDialog(
       context: context,
       barrierDismissible: false,
