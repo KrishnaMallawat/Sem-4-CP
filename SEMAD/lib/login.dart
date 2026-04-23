@@ -24,6 +24,24 @@ class _MathQuestLoginState extends State<MathQuestLogin> {
   final _gradeController = TextEditingController();
   final _schoolController = TextEditingController();
   final _usernameController = TextEditingController();
+  List<String> _schoolOptions = [];
+
+  @override
+  void initState() {
+    super.initState();
+    _loadSchools();
+  }
+
+  Future<void> _loadSchools() async {
+    try {
+      final res = await Supabase.instance.client.from('schools').select('school_name').order('school_name');
+      setState(() {
+        _schoolOptions = (res as List).map((r) => r['school_name'].toString()).toList();
+      });
+    } catch(e) {
+      debugPrint("Error loading schools: $e");
+    }
+  }
 
   final Color vibrantBlue = const Color(0xFF2196F3);
   final Color deepNavy = const Color(0xFF000C2D);
@@ -207,11 +225,7 @@ class _MathQuestLoginState extends State<MathQuestLogin> {
                           controller: _gradeController,
                         ),
                         const SizedBox(height: 15),
-                        _buildPillInput(
-                          hint: "School Name",
-                          icon: Icons.business_outlined,
-                          controller: _schoolController,
-                        ),
+                        _buildSchoolAutocomplete(),
                       ],
 
                       const SizedBox(height: 15),
@@ -317,6 +331,75 @@ class _MathQuestLoginState extends State<MathQuestLogin> {
       child: Opacity(
         opacity: 0.05,
         child: Text(char, style: GoogleFonts.lexend(fontSize: 280, color: Colors.white, fontWeight: FontWeight.w900)),
+      ),
+    );
+  }
+  Widget _buildSchoolAutocomplete() {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(10),
+        boxShadow: [
+          BoxShadow(color: Colors.black.withOpacity(0.1), blurRadius: 10, offset: const Offset(0, 5)),
+        ],
+      ),
+      child: Autocomplete<String>(
+        optionsBuilder: (TextEditingValue textEditingValue) {
+          if (textEditingValue.text.isEmpty) {
+            return const Iterable<String>.empty();
+          }
+          return _schoolOptions.where((String option) {
+            return option.toLowerCase().contains(textEditingValue.text.toLowerCase());
+          });
+        },
+        onSelected: (String selection) {
+          _schoolController.text = selection;
+        },
+        fieldViewBuilder: (context, controller, focusNode, onFieldSubmitted) {
+          if (controller.text.isEmpty && _schoolController.text.isNotEmpty) {
+            controller.text = _schoolController.text;
+          }
+          controller.addListener(() {
+            _schoolController.text = controller.text;
+          });
+          return TextField(
+            controller: controller,
+            focusNode: focusNode,
+            style: GoogleFonts.lexend(color: deepNavy, fontSize: 14),
+            decoration: InputDecoration(
+              hintText: "School Name",
+              hintStyle: GoogleFonts.lexend(color: Colors.grey.shade400, fontSize: 14),
+              prefixIcon: Icon(Icons.business_outlined, color: Colors.grey.shade400, size: 20),
+              border: InputBorder.none,
+              contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 15),
+            ),
+          );
+        },
+        optionsViewBuilder: (context, onSelected, options) {
+          return Align(
+            alignment: Alignment.topLeft,
+            child: Material(
+              color: Colors.white,
+              elevation: 4.0,
+              borderRadius: BorderRadius.circular(10),
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxHeight: 200, maxWidth: 300),
+                child: ListView.builder(
+                  padding: EdgeInsets.zero,
+                  shrinkWrap: true,
+                  itemCount: options.length,
+                  itemBuilder: (BuildContext context, int index) {
+                    final String option = options.elementAt(index);
+                    return ListTile(
+                      title: Text(option, style: GoogleFonts.lexend(color: deepNavy, fontSize: 13)),
+                      onTap: () => onSelected(option),
+                    );
+                  },
+                ),
+              ),
+            ),
+          );
+        },
       ),
     );
   }
