@@ -28,6 +28,7 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
   final _confirmPassController = TextEditingController();
 
   bool _isLoading = false;
+  bool _isInitialDataLoaded = false;
 
   @override
   void initState() {
@@ -200,6 +201,17 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
         backgroundColor: Colors.transparent,
         centerTitle: true,
         elevation: 0,
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.logout_rounded, color: Colors.redAccent, size: 24),
+            onPressed: () async {
+              await _supabase.auth.signOut();
+              if (mounted) {
+                Navigator.pushNamedAndRemoveUntil(context, '/login', (route) => false);
+              }
+            },
+          ),
+        ],
         bottom: TabBar(
           controller: _tabController,
           indicatorColor: themeYellow,
@@ -236,18 +248,16 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
                 if (!snapshot.hasData) return const Center(child: CircularProgressIndicator(color: themeYellow));
 
                 final data = snapshot.data!.first;
-
-                // Keep controllers synced with DB but only if user isn't typing
-                if (_nameController.text.isEmpty) _nameController.text = data['username'] ?? "";
-                if (_schoolController.text.isEmpty) _schoolController.text = data['school'] ?? "";
-                if (_gradeController.text.isEmpty) _gradeController.text = data['grade'] ?? "";
-                if (_userTagController.text.isEmpty) {
-                  _userTagController.text = data['user_tag'] ?? "${data['username'] ?? 'user'}${DateTime.now().millisecondsSinceEpoch.toString().substring(9)}";
-                }
                 
-                // Initialize visibility if not set
-                if (data['leaderboard_visibility'] != null) {
-                   _visibility = data['leaderboard_visibility'];
+                if (!_isInitialDataLoaded) {
+                  _nameController.text = data['username'] ?? "";
+                  _schoolController.text = data['school'] ?? "";
+                  _gradeController.text = data['grade'] ?? "";
+                  _userTagController.text = data['user_tag'] ?? "";
+                  if (data['leaderboard_visibility'] != null) {
+                    _visibility = data['leaderboard_visibility'];
+                  }
+                  _isInitialDataLoaded = true;
                 }
 
                 return TabBarView(
@@ -268,7 +278,7 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
   }
 
   Widget _buildProfileTab(Map data, Color yellow, Color navy) {
-    bool isComplete = data['school'] != null && data['grade'] != null && data['display_name'] != null;
+    bool isComplete = data['school'] != null && data['grade'] != null && data['username'] != null;
     String? avatarUrl = data['avatar_url'];
 
     return SingleChildScrollView(

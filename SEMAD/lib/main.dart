@@ -125,17 +125,6 @@ class HomeGridScreen extends StatelessWidget {
 
         // 2. THE XP BOX (RIGHT SIDE)
         actions: [
-          // 1. LOGOUT
-          IconButton(
-            icon: const Icon(Icons.logout_rounded, color: Colors.redAccent, size: 24),
-            onPressed: () async {
-              await SupaService.logout();
-              if (context.mounted) {
-                Navigator.pushNamedAndRemoveUntil(context, '/login', (route) => false);
-              }
-            },
-          ),
-
           // 2. ACHIEVEMENTS ICON
           IconButton(
             icon: const Icon(Icons.verified_outlined, color: Colors.cyanAccent, size: 24),
@@ -533,11 +522,14 @@ Widget _buildLeaderboardTab(Color themeYellow, Color petalPink, {required String
         bool isMe = p['id'] == currentUserId;
 
         if (filter == 'global') {
-          if (visibility == 'school' && !isMe) continue; // Hide school-only from global unless me
+          // In Global, only show people who set visibility to 'global' (and always show 'Me')
+          if (!isMe && visibility != 'global') continue; 
           filteredPlayers.add(p);
         } else if (filter == 'school') {
+          // In School, only show people in same school who aren't 'hidden' (and always show 'Me')
           if (mySchool == null || mySchool.isEmpty) continue; 
           if (p['school'] != mySchool) continue; 
+          if (!isMe && visibility == 'hidden') continue;
           filteredPlayers.add(p);
         }
       }
@@ -694,7 +686,7 @@ Widget _buildFriendsTab(BuildContext context, Color themeYellow, Color petalPink
       final myId = supabase.auth.currentUser!.id;
 
       final pendingIncoming = friendships.where((f) => f['status'] == 'pending' && f['addressee_id'] == myId).toList();
-      final accepted = friendships.where((f) => f['status'] == 'accepted').toList();
+      final accepted = friendships.where((f) => f['status'] == 'accepted' && (f['requester_id'] == myId || f['addressee_id'] == myId)).toList();
 
       final userIdsToFetch = <String>{};
       for (var f in pendingIncoming) userIdsToFetch.add(f['requester_id']);
@@ -756,11 +748,25 @@ Widget _buildFriendsTab(BuildContext context, Color themeYellow, Color petalPink
                         Expanded(child: Text(p['username'] ?? 'Unknown', style: GoogleFonts.lexend(color: Colors.white, fontWeight: FontWeight.bold))),
                         IconButton(
                           icon: const Icon(Icons.check_circle, color: Colors.greenAccent),
-                          onPressed: () => SupaService.acceptFriendRequest(f['id']),
+                          onPressed: () async {
+                            try {
+                              await SupaService.acceptFriendRequest(f['id']);
+                              if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Friend request accepted!")));
+                            } catch (e) {
+                              if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Error: $e"), backgroundColor: Colors.redAccent));
+                            }
+                          },
                         ),
                         IconButton(
                           icon: const Icon(Icons.cancel, color: Colors.redAccent),
-                          onPressed: () => SupaService.removeOrRejectFriend(f['id']),
+                          onPressed: () async {
+                            try {
+                              await SupaService.removeOrRejectFriend(f['id']);
+                              if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Friend request rejected.")));
+                            } catch (e) {
+                              if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Error: $e"), backgroundColor: Colors.redAccent));
+                            }
+                          },
                         ),
                       ],
                     ),
