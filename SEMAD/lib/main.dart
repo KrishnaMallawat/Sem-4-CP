@@ -480,32 +480,39 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
           itemCount: schools.length,
           itemBuilder: (context, index) {
             final s = schools[index];
-            return Container(
-              margin: const EdgeInsets.only(bottom: 15),
-              padding: const EdgeInsets.all(20),
-              decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.04),
-                borderRadius: BorderRadius.circular(15),
-                border: Border.all(color: Colors.white10),
-              ),
-              child: Row(
-                children: [
-                  CircleAvatar(
-                    backgroundColor: yellow.withOpacity(0.1),
-                    child: Text("${index + 1}", style: GoogleFonts.lexend(color: yellow, fontWeight: FontWeight.bold)),
-                  ),
-                  const SizedBox(width: 20),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(s['school'] ?? "Unknown School", style: GoogleFonts.lexend(color: Colors.white, fontWeight: FontWeight.bold)),
-                        Text("${s['student_count']} Students", style: GoogleFonts.lexend(color: Colors.white38, fontSize: 10)),
-                      ],
+            return GestureDetector(
+              onTap: () => Navigator.of(context).push(MaterialPageRoute(
+                builder: (_) => _SchoolMembersScreen(schoolName: s['school'] ?? 'Unknown'),
+              )),
+              child: Container(
+                margin: const EdgeInsets.only(bottom: 15),
+                padding: const EdgeInsets.all(20),
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.04),
+                  borderRadius: BorderRadius.circular(15),
+                  border: Border.all(color: Colors.white10),
+                ),
+                child: Row(
+                  children: [
+                    CircleAvatar(
+                      backgroundColor: yellow.withOpacity(0.1),
+                      child: Text("${index + 1}", style: GoogleFonts.lexend(color: yellow, fontWeight: FontWeight.bold)),
                     ),
-                  ),
-                  Text("${s['total_xp']} XP", style: GoogleFonts.lexend(color: yellow, fontWeight: FontWeight.bold, fontSize: 18)),
-                ],
+                    const SizedBox(width: 20),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(s['school'] ?? "Unknown School", style: GoogleFonts.lexend(color: Colors.white, fontWeight: FontWeight.bold)),
+                          Text("${s['student_count']} Students", style: GoogleFonts.lexend(color: Colors.white38, fontSize: 10)),
+                        ],
+                      ),
+                    ),
+                    Text("${s['total_xp']} XP", style: GoogleFonts.lexend(color: yellow, fontWeight: FontWeight.bold, fontSize: 18)),
+                    const SizedBox(width: 8),
+                    const Icon(Icons.chevron_right_rounded, color: Colors.white24),
+                  ],
+                ),
               ),
             );
           },
@@ -565,6 +572,100 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+// ─── School Members sub-screen ───────────────────────────────────────────────
+class _SchoolMembersScreen extends StatelessWidget {
+  final String schoolName;
+  const _SchoolMembersScreen({required this.schoolName});
+
+  static const Color _yellow = Color(0xFFFFC741);
+  static const Color _navy  = Color(0xFF000C2D);
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: _navy,
+      appBar: AppBar(
+        backgroundColor: _navy,
+        elevation: 0,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white),
+          onPressed: () => Navigator.of(context).pop(),
+        ),
+        title: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(schoolName, style: GoogleFonts.lexend(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14)),
+            Text("SCHOOL RANKINGS", style: GoogleFonts.lexend(color: Colors.white38, fontSize: 10, letterSpacing: 1)),
+          ],
+        ),
+      ),
+      body: StreamBuilder(
+        stream: supabase
+            .from('profiles')
+            .stream(primaryKey: ['id'])
+            .eq('school', schoolName)
+            .order('xp', ascending: false),
+        builder: (context, snapshot) {
+          if (!snapshot.hasData) return const Center(child: CircularProgressIndicator(color: _yellow));
+          final members = snapshot.data as List<Map<String, dynamic>>;
+          if (members.isEmpty) return Center(child: Text("No members found.", style: GoogleFonts.lexend(color: Colors.white38)));
+
+          final myId = supabase.auth.currentUser?.id;
+
+          return ListView.builder(
+            padding: const EdgeInsets.all(20),
+            physics: const BouncingScrollPhysics(),
+            itemCount: members.length,
+            itemBuilder: (context, index) {
+              final p = members[index];
+              final bool isMe = p['id'] == myId;
+              final Color rankColor = index == 0 ? _yellow : (index == 1 ? Colors.white70 : (index == 2 ? Colors.orangeAccent : Colors.white24));
+
+              return GestureDetector(
+                onTap: () => _showPlayerProfileBottomSheet(context, p, isMe),
+                child: Container(
+                  margin: const EdgeInsets.only(bottom: 12),
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  decoration: BoxDecoration(
+                    color: isMe ? const Color(0xFFFF80AB).withOpacity(0.1) : Colors.white.withOpacity(0.04),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: isMe ? const Color(0xFFFF80AB).withOpacity(0.6) : Colors.white10),
+                  ),
+                  child: Row(
+                    children: [
+                      SizedBox(width: 32, child: Text("${index + 1}", style: GoogleFonts.lexend(color: rankColor, fontWeight: FontWeight.w900, fontSize: 20))),
+                      CircleAvatar(
+                        radius: 22,
+                        backgroundColor: Colors.white12,
+                        backgroundImage: p['avatar_url'] != null ? NetworkImage(p['avatar_url']) : null,
+                        child: p['avatar_url'] == null ? const Icon(Icons.person, size: 20, color: Colors.white24) : null,
+                      ),
+                      const SizedBox(width: 14),
+                      Expanded(
+                        child: Text(
+                          p['username'] ?? 'ADVENTURER',
+                          style: GoogleFonts.lexend(color: isMe ? Colors.white : Colors.white70, fontWeight: isMe ? FontWeight.w700 : FontWeight.w400, fontSize: 15),
+                        ),
+                      ),
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.end,
+                        children: [
+                          Text("${p['xp'] ?? 0}", style: GoogleFonts.lexend(color: _yellow, fontWeight: FontWeight.w900, fontSize: 18)),
+                          Text("XP", style: GoogleFonts.lexend(color: Colors.white24, fontSize: 10, fontWeight: FontWeight.bold)),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            },
+          );
+        },
       ),
     );
   }

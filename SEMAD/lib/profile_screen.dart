@@ -568,18 +568,42 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
               Text("SKILL ANALYSIS", style: lexendStyle(size: 14, color: Colors.white70, weight: FontWeight.bold)),
               const SizedBox(height: 20),
               
-              // Radar Chart Card
-              Container(
-                height: 250,
-                width: double.infinity,
-                padding: const EdgeInsets.all(20),
-                decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.03),
-                  borderRadius: BorderRadius.circular(20),
-                  border: Border.all(color: Colors.white10),
-                ),
-                child: CustomPaint(
-                  painter: RadarChartPainter(_domainScores, yellow),
+              // Radar Chart Card — tappable for full detail
+              GestureDetector(
+                onTap: () => Navigator.of(context).push(MaterialPageRoute(
+                  builder: (_) => _RadarDetailScreen(
+                    domainScores: Map.from(_domainScores),
+                    yellow: yellow,
+                  ),
+                )),
+                child: Container(
+                  height: 260,
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(20),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.03),
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(color: Colors.white10),
+                  ),
+                  child: Stack(
+                    children: [
+                      CustomPaint(
+                        size: Size.infinite,
+                        painter: RadarChartPainter(_domainScores, yellow),
+                      ),
+                      Positioned(
+                        bottom: 6,
+                        right: 6,
+                        child: Row(
+                          children: [
+                            Icon(Icons.open_in_full_rounded, color: Colors.white24, size: 13),
+                            const SizedBox(width: 4),
+                            Text("Tap to expand", style: GoogleFonts.lexend(color: Colors.white24, fontSize: 9)),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ),
               
@@ -714,7 +738,7 @@ class RadarChartPainter extends CustomPainter {
 
     // Normalize scores relative to a realistic "Mastery" level (e.g., 200 XP)
     // If the user has more, the chart just stays at the outer ring.
-    const double masteryLevel = 200.0;
+    const double masteryLevel = 50.0; // Reduced so even small XP values show prominently
     
     for (int i = 0; i < domains.length; i++) {
       double score = (scores[domains[i]] ?? 0).clamp(0, masteryLevel);
@@ -746,3 +770,135 @@ class RadarChartPainter extends CustomPainter {
   @override
   bool shouldRepaint(RadarChartPainter old) => true;
 }
+
+// ─── Full-screen radar detail ─────────────────────────────────────────────────
+class _RadarDetailScreen extends StatelessWidget {
+  final Map<String, double> domainScores;
+  final Color yellow;
+  const _RadarDetailScreen({required this.domainScores, required this.yellow});
+
+  static const Map<String, Map<String, String>> _domainInfo = {
+    'Arithmetic': {'game': 'Bazaar Bill', 'desc': 'Addition, subtraction & mental math through market trading.', 'icon': '🛒'},
+    'Fractions':  {'game': 'Fraction Fields', 'desc': 'Scaling fractions by growing and harvesting crops.', 'icon': '🌾'},
+    'Geometry':   {'game': 'Shape Surge', 'desc': 'Identifying and slicing geometric shapes at speed.', 'icon': '🔷'},
+    'Logic':      {'game': 'Formula Flash', 'desc': 'Pattern recognition and algebraic formula matching.', 'icon': '⚡'},
+    'Speed':      {'game': 'Quick Tick', 'desc': 'Time-pressure arithmetic and rapid calculations.', 'icon': '⏱️'},
+  };
+
+  @override
+  Widget build(BuildContext context) {
+    const Color navy = Color(0xFF000C2D);
+    final entries = domainScores.entries.toList();
+    entries.sort((a, b) => b.value.compareTo(a.value));
+    final totalXP = domainScores.values.fold(0.0, (a, b) => a + b);
+
+    return Scaffold(
+      backgroundColor: navy,
+      appBar: AppBar(
+        backgroundColor: navy,
+        elevation: 0,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white),
+          onPressed: () => Navigator.of(context).pop(),
+        ),
+        title: Text("SKILL BREAKDOWN", style: GoogleFonts.lexend(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16, letterSpacing: 1)),
+      ),
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.all(20),
+        physics: const BouncingScrollPhysics(),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Big radar chart
+            Container(
+              height: 320,
+              width: double.infinity,
+              padding: const EdgeInsets.all(24),
+              decoration: BoxDecoration(
+                color: Colors.white.withOpacity(0.03),
+                borderRadius: BorderRadius.circular(24),
+                border: Border.all(color: Colors.white10),
+              ),
+              child: CustomPaint(
+                size: Size.infinite,
+                painter: RadarChartPainter(domainScores, yellow),
+              ),
+            ),
+            const SizedBox(height: 8),
+            Center(
+              child: Text(
+                "Total Proficiency XP: ${totalXP.toStringAsFixed(0)}",
+                style: GoogleFonts.lexend(color: Colors.white38, fontSize: 11),
+              ),
+            ),
+            const SizedBox(height: 28),
+            Text("DOMAIN BREAKDOWN", style: GoogleFonts.lexend(color: Colors.white54, fontSize: 12, fontWeight: FontWeight.bold, letterSpacing: 1)),
+            const SizedBox(height: 16),
+            ...entries.map((entry) {
+              final info = _domainInfo[entry.key]!;
+              final double pct = totalXP == 0 ? 0 : (entry.value / totalXP).clamp(0, 1);
+              final bool isTop = entry == entries.first && entry.value > 0;
+              return Container(
+                margin: const EdgeInsets.only(bottom: 14),
+                padding: const EdgeInsets.all(18),
+                decoration: BoxDecoration(
+                  color: isTop ? yellow.withOpacity(0.07) : Colors.white.withOpacity(0.04),
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: isTop ? yellow.withOpacity(0.3) : Colors.white10),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Text(info['icon']!, style: const TextStyle(fontSize: 22)),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                children: [
+                                  Text(entry.key, style: GoogleFonts.lexend(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 15)),
+                                  if (isTop) ...[
+                                    const SizedBox(width: 8),
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                      decoration: BoxDecoration(color: yellow.withOpacity(0.2), borderRadius: BorderRadius.circular(20)),
+                                      child: Text("STRONGEST", style: GoogleFonts.lexend(color: yellow, fontSize: 8, fontWeight: FontWeight.bold)),
+                                    ),
+                                  ]
+                                ],
+                              ),
+                              Text("via ${info['game']}", style: GoogleFonts.lexend(color: Colors.white38, fontSize: 10)),
+                            ],
+                          ),
+                        ),
+                        Text("${entry.value.toStringAsFixed(0)} XP", style: GoogleFonts.lexend(color: yellow, fontWeight: FontWeight.bold, fontSize: 18)),
+                      ],
+                    ),
+                    const SizedBox(height: 10),
+                    // Progress bar
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(4),
+                      child: LinearProgressIndicator(
+                        value: pct,
+                        backgroundColor: Colors.white10,
+                        valueColor: AlwaysStoppedAnimation<Color>(yellow.withOpacity(0.8)),
+                        minHeight: 6,
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    Text(info['desc']!, style: GoogleFonts.lexend(color: Colors.white38, fontSize: 11)),
+                  ],
+                ),
+              );
+            }),
+            const SizedBox(height: 30),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
