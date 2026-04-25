@@ -391,29 +391,7 @@ class _GameModuleCardState extends State<GameModuleCard> {
           ),
         ),
 
-        // --- THE WHITE "i" CIRCLE (TOP RIGHT) ---
-        Positioned(
-          top: 12,
-          right: 12,
-          child: GestureDetector(
-            onTap: () => _showSmallTabInstructions(context),
-            child: Container(
-              padding: const EdgeInsets.all(6),
-              decoration: const BoxDecoration(
-                color: Colors.white, // White circle
-                shape: BoxShape.circle,
-                boxShadow: [
-                  BoxShadow(color: Colors.black26, blurRadius: 4, offset: Offset(0, 2))
-                ],
-              ),
-              child: const Icon(
-                Icons.info_outline_rounded,
-                color: Color(0xFF000C2D), // Deep Navy icon
-                size: 22,
-              ),
-            ),
-          ),
-        ),
+
       ],
     );
   }
@@ -708,63 +686,152 @@ Widget _buildLeaderboardTab(Color themeYellow, Color petalPink, {required String
 }
 
 void _showPlayerProfileBottomSheet(BuildContext context, Map<String, dynamic> player, bool isMe) {
-  final Color themeYellow = const Color(0xFFFFC741);
-  final String? avatarUrl = player['avatar_url'];
-  
   showModalBottomSheet(
     context: context,
     backgroundColor: const Color(0xFF000C2D),
     shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
-    builder: (context) {
-      return Container(
-        padding: const EdgeInsets.all(30),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            CircleAvatar(
-              radius: 40,
-              backgroundColor: Colors.white12,
-              backgroundImage: avatarUrl != null ? NetworkImage(avatarUrl) : null,
-              child: avatarUrl == null ? const Icon(Icons.person, size: 40, color: Colors.white24) : null,
-            ),
-            const SizedBox(height: 15),
-            Text(player['username'] ?? 'ADVENTURER', style: GoogleFonts.lexend(fontSize: 22, color: Colors.white, fontWeight: FontWeight.bold)),
-            if (player['school'] != null && player['school'].toString().isNotEmpty) 
-              Text(player['school'], style: GoogleFonts.lexend(color: Colors.white54, fontSize: 12), textAlign: TextAlign.center),
-            const SizedBox(height: 10),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 5),
-              decoration: BoxDecoration(color: themeYellow.withOpacity(0.1), borderRadius: BorderRadius.circular(20)),
-              child: Text("${player['xp'] ?? 0} XP", style: GoogleFonts.lexend(color: themeYellow, fontWeight: FontWeight.bold)),
-            ),
-            const SizedBox(height: 30),
-            if (!isMe)
-              ElevatedButton.icon(
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: themeYellow,
-                  foregroundColor: const Color(0xFF000C2D),
-                  minimumSize: const Size(double.infinity, 50),
-                ),
-                icon: const Icon(Icons.person_add_rounded),
-                label: Text("SEND FRIEND REQUEST", style: GoogleFonts.lexend(fontWeight: FontWeight.bold)),
-                onPressed: () async {
-                  try {
-                    await SupaService.sendFriendRequestById(player['id']);
-                    if (context.mounted) {
-                      Navigator.pop(context);
-                      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Friend request sent!")));
-                    }
-                  } catch (e) {
-                    if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString().replaceAll("Exception: ", ""))));
-                  }
-                },
-              )
-          ],
-        ),
-      );
-    }
+    builder: (context) => _PlayerProfileSheet(player: player, isMe: isMe),
   );
 }
+
+class _PlayerProfileSheet extends StatefulWidget {
+  final Map<String, dynamic> player;
+  final bool isMe;
+  const _PlayerProfileSheet({required this.player, required this.isMe});
+
+  @override
+  State<_PlayerProfileSheet> createState() => _PlayerProfileSheetState();
+}
+
+class _PlayerProfileSheetState extends State<_PlayerProfileSheet> {
+  Map<String, dynamic>? _friendship;
+  bool _loading = true;
+  final Color themeYellow = const Color(0xFFFFC741);
+  final String myId = Supabase.instance.client.auth.currentUser!.id;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadFriendship();
+  }
+
+  Future<void> _loadFriendship() async {
+    final f = await SupaService.getFriendshipWith(widget.player['id']);
+    if (mounted) setState(() { _friendship = f; _loading = false; });
+  }
+
+  Future<void> _sendRequest() async {
+    setState(() => _loading = true);
+    try {
+      await SupaService.sendFriendRequestById(widget.player['id']);
+      await _loadFriendship();
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Friend request sent!")));
+    } catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString().replaceAll("Exception: ", ""))));
+      setState(() => _loading = false);
+    }
+  }
+
+  Future<void> _removeFriend() async {
+    if (_friendship == null) return;
+    setState(() => _loading = true);
+    await SupaService.removeOrRejectFriend(_friendship!['id']);
+    await _loadFriendship();
+    if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Friend removed.")));
+  }
+
+  Widget _buildActionButton() {
+    if (_loading) return const Center(child: CircularProgressIndicator(color: Color(0xFFFFC741)));
+
+    if (_friendship == null) {
+      // No relationship — allow sending request
+      return ElevatedButton.icon(
+        style: ElevatedButton.styleFrom(backgroundColor: themeYellow, foregroundColor: const Color(0xFF000C2D), minimumSize: const Size(double.infinity, 50)),
+        icon: const Icon(Icons.person_add_rounded),
+        label: Text("SEND FRIEND REQUEST", style: GoogleFonts.lexend(fontWeight: FontWeight.bold)),
+        onPressed: _sendRequest,
+      );
+    }
+
+    final status = _friendship!['status'];
+    final iRequested = _friendship!['requester_id'] == myId;
+
+    if (status == 'accepted') {
+      // Already friends → show Remove
+      return ElevatedButton.icon(
+        style: ElevatedButton.styleFrom(backgroundColor: Colors.redAccent.withOpacity(0.15), foregroundColor: Colors.redAccent, minimumSize: const Size(double.infinity, 50), side: const BorderSide(color: Colors.redAccent)),
+        icon: const Icon(Icons.person_remove_rounded),
+        label: Text("REMOVE FRIEND", style: GoogleFonts.lexend(fontWeight: FontWeight.bold)),
+        onPressed: _removeFriend,
+      );
+    }
+
+    if (status == 'pending' && iRequested) {
+      // I sent the request — show disabled "Request Sent"
+      return ElevatedButton.icon(
+        style: ElevatedButton.styleFrom(backgroundColor: Colors.white10, foregroundColor: Colors.white38, minimumSize: const Size(double.infinity, 50)),
+        icon: const Icon(Icons.hourglass_top_rounded),
+        label: Text("REQUEST SENT", style: GoogleFonts.lexend(fontWeight: FontWeight.bold)),
+        onPressed: null,
+      );
+    }
+
+    if (status == 'pending' && !iRequested) {
+      // They sent me a request — show Accept
+      return ElevatedButton.icon(
+        style: ElevatedButton.styleFrom(backgroundColor: Colors.greenAccent, foregroundColor: const Color(0xFF000C2D), minimumSize: const Size(double.infinity, 50)),
+        icon: const Icon(Icons.check_rounded),
+        label: Text("ACCEPT REQUEST", style: GoogleFonts.lexend(fontWeight: FontWeight.bold)),
+        onPressed: () async {
+          setState(() => _loading = true);
+          await SupaService.acceptFriendRequest(_friendship!['id']);
+          await _loadFriendship();
+          if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Friend added!")));
+        },
+      );
+    }
+
+    // Rejected / unknown — allow sending again
+    return ElevatedButton.icon(
+      style: ElevatedButton.styleFrom(backgroundColor: themeYellow, foregroundColor: const Color(0xFF000C2D), minimumSize: const Size(double.infinity, 50)),
+      icon: const Icon(Icons.person_add_rounded),
+      label: Text("SEND FRIEND REQUEST", style: GoogleFonts.lexend(fontWeight: FontWeight.bold)),
+      onPressed: _sendRequest,
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final avatarUrl = widget.player['avatar_url'];
+    return Container(
+      padding: EdgeInsets.fromLTRB(30, 30, 30, MediaQuery.of(context).padding.bottom + 30),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          CircleAvatar(
+            radius: 40,
+            backgroundColor: Colors.white12,
+            backgroundImage: avatarUrl != null ? NetworkImage(avatarUrl) : null,
+            child: avatarUrl == null ? const Icon(Icons.person, size: 40, color: Colors.white24) : null,
+          ),
+          const SizedBox(height: 15),
+          Text(widget.player['username'] ?? 'ADVENTURER', style: GoogleFonts.lexend(fontSize: 22, color: Colors.white, fontWeight: FontWeight.bold)),
+          if (widget.player['school'] != null && widget.player['school'].toString().isNotEmpty)
+            Text(widget.player['school'], style: GoogleFonts.lexend(color: Colors.white54, fontSize: 12), textAlign: TextAlign.center),
+          const SizedBox(height: 10),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 5),
+            decoration: BoxDecoration(color: themeYellow.withOpacity(0.1), borderRadius: BorderRadius.circular(20)),
+            child: Text("${widget.player['xp'] ?? 0} XP", style: GoogleFonts.lexend(color: themeYellow, fontWeight: FontWeight.bold)),
+          ),
+          const SizedBox(height: 25),
+          if (!widget.isMe) _buildActionButton(),
+        ],
+      ),
+    );
+  }
+}
+
 
 Widget _buildFriendsTab(BuildContext context, Color themeYellow, Color petalPink) {
   return StreamBuilder<List<Map<String, dynamic>>>(

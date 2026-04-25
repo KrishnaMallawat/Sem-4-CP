@@ -2,7 +2,6 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'dart:io';
 import 'dart:math';
 import 'package:flutter/services.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
 class SupaService {
   static final _supabase = Supabase.instance.client;
@@ -134,6 +133,17 @@ class SupaService {
   // 14. Reject/Remove Friend
   static Future<void> removeOrRejectFriend(String friendshipId) async {
     await _supabase.from('friendships').delete().eq('id', friendshipId);
+  }
+
+  // 15. Get friendship record between current user and a target user
+  // Returns null if no relationship, otherwise the full friendship row.
+  static Future<Map<String, dynamic>?> getFriendshipWith(String targetId) async {
+    final myId = _supabase.auth.currentUser!.id;
+    return await _supabase
+        .from('friendships')
+        .select()
+        .or('and(requester_id.eq.$myId,addressee_id.eq.$targetId),and(requester_id.eq.$targetId,addressee_id.eq.$myId)')
+        .maybeSingle();
   }
 
   // 15. Stream Friendships
