@@ -47,21 +47,21 @@ class MathQuestApp extends StatelessWidget {
       routes: {
         '/': (context) => const MathQuestLoading(),
         '/login': (context) => const MathQuestLogin(),
-        '/home': (context) => const GanitControlCenter(),
+        '/home': (context) => const MathQuestControlCenter(),
       },
       initialRoute: '/',
     );
   }
 }
 
-class GanitControlCenter extends StatefulWidget {
-  const GanitControlCenter({super.key});
+class MathQuestControlCenter extends StatefulWidget {
+  const MathQuestControlCenter({super.key});
 
   @override
-  State<GanitControlCenter> createState() => _GanitControlCenterState();
+  State<MathQuestControlCenter> createState() => _MathQuestControlCenterState();
 }
 
-class _GanitControlCenterState extends State<GanitControlCenter> {
+class _MathQuestControlCenterState extends State<MathQuestControlCenter> {
   int _currentIndex = 0;
 
   late final List<Widget> _screens = [
