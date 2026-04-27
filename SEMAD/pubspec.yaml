@@ -57,8 +57,8 @@ flutter_launcher_icons:
   android: "launcher_icon"
   ios: true
   image_path: "assets/mathquestlogo.png"
-  adaptive_icon_background: "#000C2D" # Your Deep Navy color
-  adaptive_icon_foreground: "assets/mathquestlogo.png"
+  adaptive_icon_background: "#0ABFBC"
+  adaptive_icon_foreground: "assets/mathquestforeground.png"
 
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec
@@ -72,6 +72,8 @@ flutter:
   uses-material-design: true
   assets:
     - .env
+    - assets/mathquestlogo.png
+    - assets/mathquestforeground.png
     - assets/1.png
     - assets/2.png
     - assets/3.png
