@@ -100,7 +100,7 @@ class _MathQuestLoginState extends State<MathQuestLogin> {
         if (res.user != null && mounted) {
           Navigator.pushReplacement(
             context,
-            MaterialPageRoute(builder: (context) => const GanitControlCenter()),
+            MaterialPageRoute(builder: (context) => const MathQuestControlCenter()),
           );
         }
       } else {
@@ -112,7 +112,7 @@ class _MathQuestLoginState extends State<MathQuestLogin> {
         if (mounted) {
           Navigator.pushReplacement(
             context,
-            MaterialPageRoute(builder: (context) => const GanitControlCenter()),
+            MaterialPageRoute(builder: (context) => const MathQuestControlCenter()),
           );
         }
       }
