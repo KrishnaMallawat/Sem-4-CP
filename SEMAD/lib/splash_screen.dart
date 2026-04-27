@@ -60,7 +60,7 @@ class _MathQuestLoadingState extends State<MathQuestLoading> with SingleTickerPr
       PageRouteBuilder(
         // If session exists, go to Dashboard. Otherwise, Login.
         pageBuilder: (context, anim1, anim2) =>
-        session != null ? const MathQuestControlCenter() : const MathQuestLogin(),
+        session != null ? const GanitControlCenter() : const MathQuestLogin(),
         transitionsBuilder: (context, anim1, anim2, child) =>
             FadeTransition(opacity: anim1, child: child),
         transitionDuration: const Duration(milliseconds: 800),
