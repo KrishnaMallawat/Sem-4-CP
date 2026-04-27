@@ -57,8 +57,8 @@ flutter_launcher_icons:
   android: "launcher_icon"
   ios: true
   image_path: "assets/mathquestlogo.png"
-  adaptive_icon_background: "#0ABFBC"
-  adaptive_icon_foreground: "assets/mathquestforeground.png"
+  adaptive_icon_background: "#000C2D"
+  adaptive_icon_foreground: "assets/mathquestlogo.png"
 
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec
